@@ -2,7 +2,7 @@
 #include <QCommandLineParser>
 #include <QDebug>
 #include <QFile>
-
+#include <iostream>
 #include "card.h"
 
 class Pile
@@ -11,6 +11,10 @@ public:
     Pile(QString _prefix) { prefix = _prefix; }
     bool addCard(QString token);
     QString toString();
+    QString name() const { return prefix; }
+    bool empty() const { return cards.empty(); }
+    Card at(int index) const { return cards[index]; }
+    size_t cardCount() const { return cards.count(); }
 
 private:
     QString prefix;
@@ -41,6 +45,23 @@ bool Pile::addCard(QString token)
     return true;
 }
 
+struct Move
+{
+    bool off;
+    bool talon;
+    int from;
+    int to;
+    int index;
+    Move()
+    {
+        talon = false;
+        off = false;
+        from = -1;
+        to = -1;
+        index = 0;
+    }
+};
+
 class Deck
 {
 public:
@@ -51,7 +72,100 @@ public:
         return p;
     }
     QList<Pile *> piles;
+    QList<Move> getMoves();
+    QString toString() const
+    {
+        QString ret;
+        for (Pile *p : piles)
+        {
+            ret += p->toString();
+            ret += QStringLiteral("\n");
+        }
+        return ret;
+    }
+    QString explainMove(Move m);
 };
+
+QList<Move> Deck::getMoves()
+{
+    QList<Move> ret;
+    int from = 0;
+    for (; from < 10; from++)
+    {
+        qDebug() << "Play" << piles[from]->toString();
+        if (piles[from]->empty())
+            continue;
+
+        int count = piles[from]->cardCount();
+        Suit top_suit = piles[from]->at(count - 1).suit;
+        int top_rank = int(piles[from]->at(count - 1).rank) + 1;
+
+        while (count >= 0)
+        {
+            Card current = piles[from]->at(count - 1);
+            if (!current.faceup)
+            {
+                qDebug() << "not face up";
+                break;
+            }
+            if (current.suit != top_suit)
+            {
+                qDebug() << "stop at" << count << "as suit changed";
+                break;
+            }
+            if (top_rank - 1 != current.rank)
+            {
+                qDebug() << "stop at" << count << "as ranks not order";
+                break;
+            }
+            top_rank = piles[from]->at(count - 1).rank;
+
+            for (int to = 0; to < 10; to++)
+            {
+                if (to == from)
+                    continue;
+                qDebug() << "trying to move " << count << " from " << from << " to " << to;
+                size_t to_count = piles[to]->cardCount();
+                if (to_count > 0)
+                {
+                    Card top_card = piles[to]->at(to_count - 1);
+                    if (top_card.rank != top_rank + 1)
+                    {
+                        qDebug() << "no match";
+                        continue;
+                    }
+                }
+                ret.append(Move());
+                ret.last().from = from;
+                ret.last().to = to;
+                ret.last().index = count;
+            }
+        }
+    }
+    from = 10;
+    for (; from < 14; from++)
+    {
+        if (!piles[from]->empty())
+        {
+            ret.append(Move());
+            ret.last().from = from;
+            ret.last().talon = true;
+            break;
+        }
+    }
+    return ret;
+}
+
+QString Deck::explainMove(Move m)
+{
+    if (m.talon)
+    {
+        return "Draw another talon";
+    }
+    QString fromCard = piles[m.from]->at(m.index - 1).toString();
+    QString toCard = piles[m.to]->at(piles[m.to]->cardCount() - 1).toString();
+    return QString("Move %1 cards from %2 to %3 - %4->%5").arg(piles[m.from]->cardCount() - m.index + 1).arg(m.from).arg(m.to).arg(fromCard).arg(toCard);
+}
 
 int main(int argc, char **argv)
 {
@@ -92,10 +206,12 @@ int main(int argc, char **argv)
             current_pile->addCard(token);
         }
     }
-    for (Pile *p : d.piles)
-    {
-        qDebug() << p->toString();
-    }
 
+    QList<Move> moves = d.getMoves();
+    std::cout << d.toString().toStdString();
+    for (Move m : moves)
+    {
+        std::cout << d.explainMove(m).toStdString() << std::endl;
+    }
     return 0;
 }
