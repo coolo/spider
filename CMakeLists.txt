@@ -9,6 +9,7 @@ find_package(Qt5 COMPONENTS Core REQUIRED)
 
 add_executable(spider
     main.cpp
+    card.cpp
     SpookyV2.cpp
 )
 
