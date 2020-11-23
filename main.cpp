@@ -9,19 +9,14 @@
 #include "move.h"
 #include "deck.h"
 
-class Compare
+class ChaosCompare
 {
 public:
-    bool operator() (Deck *v1, Deck *v2)
+    bool operator()(Deck *v1, Deck *v2)
     {
         return v1->chaos() > v2->chaos();
     }
 };
-
-bool compare_chaos(Deck *v1, Deck *v2)
-{
-    return v1->chaos() < v2->chaos();
-}
 
 int main(int argc, char **argv)
 {
@@ -63,13 +58,12 @@ int main(int argc, char **argv)
         }
     }
     d.calculateChaos();
-    std::priority_queue<Deck *,std::vector<Deck*>, Compare> list;
+    std::priority_queue<Deck *, std::vector<Deck *>, ChaosCompare> list;
     QSet<uint64_t> seen;
     list.push(&d);
     int min_chaos = INT_MAX;
     do
     {
-        //std::sort(list.begin(), list.end(), compare_chaos);
         d = *list.top();
         list.pop();
         //qDebug() << d.chaos();
@@ -79,7 +73,8 @@ int main(int argc, char **argv)
             min_chaos = d.chaos();
             std::cout << std::endl
                       << std::endl
-                      << min_chaos << std::endl << d.toString().toStdString();
+                      << min_chaos << std::endl
+                      << d.toString().toStdString();
         }
         for (Move m : moves)
         {

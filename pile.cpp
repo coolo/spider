@@ -79,8 +79,15 @@ Pile *Pile::newWithCard(const Card &c)
 
 void Pile::calculateId()
 {
-    QByteArray representation = toString().toLocal8Bit();
-    m_id = SpookyHash::Hash64(representation.data(), representation.size(), 1);
+    // we have max 104 cards (and all of them in one pile is rather strange)
+    // each can be represented by a byte
+    char bytes[104];
+    int index = 0;
+    for (Card c : cards)
+    {
+        bytes[index++] = c.asByte();
+    }
+    m_id = SpookyHash::Hash64(bytes, index, 1);
 }
 
 void Pile::calculateChaos()

@@ -5,10 +5,10 @@
 
 enum Suit
 {
-    Spades,
-    Hearts,
-    Clubs,
-    Diamonds
+    Spades = 0,
+    Hearts = 1,
+    Clubs = 2,
+    Diamonds = 3
 };
 enum Rank
 {
@@ -34,10 +34,16 @@ struct Card
     Suit suit;
     Rank rank;
 
-    Card() { faceup = false; rank = None; }
+    Card()
+    {
+        faceup = false;
+        rank = None;
+    }
     QString toString() const;
     Suit char2suit(char c);
     Rank char2rank(char c);
+    // 4 bits for rank, 2 bits for suit, 1 bit for faceup
+    unsigned char asByte() { return rank + (suit << 4) + (faceup << 6); }
 };
 
 #endif
