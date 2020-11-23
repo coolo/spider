@@ -31,7 +31,8 @@ QList<Move> Deck::getMoves()
                 break;
             top_rank = piles[from]->at(index).rank;
 
-            if (piles[from]->cardCount() - index == 13) {
+            if (piles[from]->cardCount() - index == 13)
+            {
                 ret.append(Move());
                 ret.last().from = from;
                 ret.last().to = 0;
@@ -82,7 +83,7 @@ QString Deck::explainMove(Move m)
     {
         return "Draw another talon";
     }
-    if (m.off) 
+    if (m.off)
     {
         return QString("Move a sequence from %1 to the off").arg(m.from);
     }
@@ -104,13 +105,15 @@ Deck *Deck::applyMove(Move m)
             newone->piles[9 - to] = newone->piles[9 - to]->newWithCard(c);
         }
         // empty pile
-        newone->piles[m.from] = new Pile(newone->piles[m.from]->name());
+        newone->piles[m.from] = new Pile();
     }
-    else if (m.off) {
+    else if (m.off)
+    {
         Card c = newone->piles[m.from]->at(newone->piles[m.from]->cardCount() - 13);
         newone->piles[15] = newone->piles[15]->newWithCard(c);
         newone->piles[m.from] = newone->piles[m.from]->remove(m.index);
-    } else
+    }
+    else
     {
         newone->piles[m.to] = newone->piles[m.to]->copyFrom(newone->piles[m.from], m.index);
         newone->piles[m.from] = newone->piles[m.from]->remove(m.index);
@@ -122,17 +125,30 @@ Deck *Deck::applyMove(Move m)
 QString Deck::toString() const
 {
     QString ret;
+    int counter = 0;
     for (Pile *p : piles)
     {
+        if (counter < 10)
+        {
+            ret += QString("Play%1:").arg(counter);
+        }
+        else if (counter < 15)
+        {
+            ret += QString("Deck%1:").arg(counter - 10);
+        }
+        else
+            ret += "Off:";
+
         ret += p->toString();
         ret += QStringLiteral("\n");
+        counter++;
     }
     return ret;
 }
 
 Pile *Deck::addPile(QString token)
 {
-    Pile *p = new Pile(token);
+    Pile *p = new Pile();
     piles.append(p);
     return p;
 }
@@ -151,7 +167,8 @@ uint64_t Deck::id()
 void Deck::calculateChaos()
 {
     m_chaos = 0;
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 10; i++)
+    {
         m_chaos += piles[i]->chaos();
     }
     for (int i = 10; i < 15; i++)

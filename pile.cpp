@@ -21,7 +21,7 @@ Pile *Pile::checkIfNew(Pile *newone)
 
 Pile *Pile::copyFrom(Pile *from, int index)
 {
-    Pile *newone = new Pile(prefix);
+    Pile *newone = new Pile();
     memcpy(newone->cards, cards, sizeof(Card) * 104);
     newone->count = count;
     for (int i = index; i < from->cardCount(); i++)
@@ -33,7 +33,7 @@ Pile *Pile::copyFrom(Pile *from, int index)
 
 QString Pile::toString() const
 {
-    QString ret = prefix;
+    QString ret;
     for (int i = 0; i < count; i++)
     {
         ret += " " + cards[i].toString();
@@ -43,7 +43,7 @@ QString Pile::toString() const
 
 Pile *Pile::remove(int index)
 {
-    Pile *newone = new Pile(prefix);
+    Pile *newone = new Pile();
     memcpy(newone->cards, cards, sizeof(Card) * 104);
     newone->count = count;
     while (newone->count > index)
@@ -73,7 +73,7 @@ bool Pile::addCard(QString token)
 
 Pile *Pile::newWithCard(const Card &c)
 {
-    Pile *newone = new Pile(prefix);
+    Pile *newone = new Pile();
     memcpy(newone->cards, cards, sizeof(Card) * 104);
     newone->count = count;
     newone->cards[newone->count++] = c;
