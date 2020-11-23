@@ -12,6 +12,7 @@ enum Suit
 };
 enum Rank
 {
+    None = 0,
     Ace = 1,
     Two = 2,
     Three = 3,
@@ -33,6 +34,7 @@ struct Card
     Suit suit;
     Rank rank;
 
+    Card() { faceup = false; rank = None; }
     QString toString() const;
     Suit char2suit(char c);
     Rank char2rank(char c);

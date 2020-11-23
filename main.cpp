@@ -56,15 +56,13 @@ int main(int argc, char **argv)
         for (Move m : moves)
         {
             
-            std::cout << std::endl << std::endl << d.toString().toStdString();
-            std::cout << d.explainMove(m).toStdString() << std::endl;
+            //std::cout << std::endl << std::endl << d.toString().toStdString();
+            //std::cout << d.explainMove(m).toStdString() << std::endl;
             Deck *newdeck = d.applyMove(m);
-            std::cout << newdeck->toString().toStdString();
+            //std::cout << newdeck->toString().toStdString();
             d = *newdeck;
             break;
         }
-        //break;
     } while (!moves.isEmpty());
-    std::cout << d.toString().toStdString();
     return 0;
 }
