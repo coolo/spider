@@ -39,6 +39,7 @@ struct Card
         faceup = false;
         rank = None;
     }
+    Card(QString token);
     QString toString() const;
     Suit char2suit(char c);
     Rank char2rank(char c);

@@ -10,7 +10,7 @@ class Deck
 {
 public:
     Deck() { m_chaos = -17; }
-    Pile *addPile(QString token);
+    void addPile(Card *cards, size_t count);
     QList<Pile *> piles;
     QList<Move> getMoves();
     QString toString() const;

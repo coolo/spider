@@ -42,7 +42,8 @@ int main(int argc, char **argv)
 
     QTextStream ts(&file);
     Deck d;
-    Pile *current_pile = 0;
+    Card cards[104];
+    int count = -1;
     while (!ts.atEnd())
     {
         QString token;
@@ -50,13 +51,17 @@ int main(int argc, char **argv)
 
         if (token.startsWith("Play") || token.startsWith("Deal") || token.startsWith("Off"))
         {
-            current_pile = d.addPile(token);
+            if (count >= 0)
+                d.addPile(cards, count);
+            count = 0;
         }
-        else if (!token.isEmpty() && current_pile)
+        else if (!token.isEmpty())
         {
-            current_pile->addCard(token);
+            Card c(token);
+            cards[count++] = c;
         }
     }
+    d.addPile(cards, count);
     d.calculateChaos();
     std::priority_queue<Deck *, std::vector<Deck *>, ChaosCompare> list;
     QSet<uint64_t> seen;

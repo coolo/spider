@@ -3,17 +3,26 @@
 #include "SpookyV2.h"
 #include <QMap>
 
-static QMap<uint64_t, Pile *> seen;
+QMap<uint64_t, Pile *> Pile::seen;
 
-Pile *Pile::checkIfNew(Pile *newone)
+Pile *Pile::createPile(Card *newcards, size_t newcount)
 {
-    newone->calculateId();
-    QMap<uint64_t, Pile *>::iterator seen_one = seen.find(newone->m_id);
+    char bytes[104];
+    int index = 0;
+    for (int i = 0; i < newcount; i++)
+    {
+        bytes[index++] = newcards[i].asByte();
+    }
+    uint64_t id = SpookyHash::Hash64(bytes, index, 1);
+    QMap<uint64_t, Pile *>::iterator seen_one = seen.find(id);
     if (seen_one != seen.end())
     {
-        delete newone;
         return *seen_one;
     }
+    Pile *newone = new Pile();
+    memcpy(newone->cards, newcards, sizeof(Card) * newcount);
+    newone->count = newcount;
+    newone->m_id = id;
     newone->calculateChaos();
     seen.insert(newone->m_id, newone);
     return newone;
@@ -21,14 +30,14 @@ Pile *Pile::checkIfNew(Pile *newone)
 
 Pile *Pile::copyFrom(Pile *from, int index)
 {
-    Pile *newone = new Pile();
-    memcpy(newone->cards, cards, sizeof(Card) * 104);
-    newone->count = count;
+    static Card newcards[104];
+    memcpy(newcards, cards, sizeof(Card) * 104);
+    int newcount = count;
     for (int i = index; i < from->cardCount(); i++)
     {
-        newone->cards[newone->count++] = from->at(i);
+        newcards[newcount++] = from->at(i);
     }
-    return checkIfNew(newone);
+    return createPile(newcards, newcount);
 }
 
 QString Pile::toString() const
@@ -43,54 +52,25 @@ QString Pile::toString() const
 
 Pile *Pile::remove(int index)
 {
-    Pile *newone = new Pile();
-    memcpy(newone->cards, cards, sizeof(Card) * 104);
-    newone->count = count;
-    while (newone->count > index)
-        newone->count--;
+    static Card newcards[104];
+    memcpy(newcards, cards, sizeof(Card) * count);
+    size_t newcount = count;
+    while (newcount > index)
+        newcount--;
     if (index > 0)
     {
-        newone->cards[index - 1].faceup = true;
+        newcards[index - 1].faceup = true;
     }
-    return checkIfNew(newone);
-}
-
-bool Pile::addCard(QString token)
-{
-    Card newone;
-    newone.faceup = !token.startsWith('|');
-    if (!newone.faceup)
-    {
-        token.remove(0, 1);
-    }
-    newone.rank = newone.char2rank(token[0].toLatin1());
-    newone.suit = newone.char2suit(token[1].toLatin1());
-    cards[count++] = newone;
-    calculateChaos();
-    calculateId();
-    return true;
+    return createPile(newcards, newcount);
 }
 
 Pile *Pile::newWithCard(const Card &c)
 {
-    Pile *newone = new Pile();
-    memcpy(newone->cards, cards, sizeof(Card) * 104);
-    newone->count = count;
-    newone->cards[newone->count++] = c;
-    return checkIfNew(newone);
-}
-
-void Pile::calculateId()
-{
-    // we have max 104 cards (and all of them in one pile is rather strange)
-    // each can be represented by a byte
-    char bytes[104];
-    int index = 0;
-    for (int i = 0; i < count; i++)
-    {
-        bytes[index++] = cards[i].asByte();
-    }
-    m_id = SpookyHash::Hash64(bytes, index, 1);
+    static Card newcards[104];
+    size_t newcount = count;
+    memcpy(newcards, cards, sizeof(Card) * count);
+    newcards[newcount++] = c;
+    return createPile(newcards, newcount);
 }
 
 void Pile::calculateChaos()

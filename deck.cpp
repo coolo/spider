@@ -105,7 +105,7 @@ Deck *Deck::applyMove(Move m)
             newone->piles[9 - to] = newone->piles[9 - to]->newWithCard(c);
         }
         // empty pile
-        newone->piles[m.from] = new Pile();
+        newone->piles[m.from] = Pile::createPile(0,0);
     }
     else if (m.off)
     {
@@ -146,11 +146,9 @@ QString Deck::toString() const
     return ret;
 }
 
-Pile *Deck::addPile(QString token)
+void Deck::addPile(Card *cards, size_t count)
 {
-    Pile *p = new Pile();
-    piles.append(p);
-    return p;
+    piles.append(Pile::createPile(cards,count));
 }
 
 uint64_t Deck::id()

@@ -6,9 +6,15 @@
 
 class Pile
 {
+private:
+    Pile()
+    {
+        m_id = 0;
+        m_chaos = 0;
+        count = 0;
+    }
+
 public:
-    Pile() { m_id = 0; m_chaos = 0; count = 0; }
-    bool addCard(QString token);
     Pile *newWithCard(const Card &c);
     QString toString() const;
     bool empty() const { return count == 0; }
@@ -18,15 +24,15 @@ public:
     Pile *copyFrom(Pile *from, int index);
     int chaos() const { return m_chaos; }
     uint64_t id() const { return m_id; }
+    static Pile *createPile(Card *cards, size_t count);
 
 private:
-    void calculateId();
     void calculateChaos();
     int m_chaos;
     uint64_t m_id;
     Card cards[104];
     size_t count;
-    static Pile *checkIfNew(Pile *newone);
+    static QMap<uint64_t, Pile *> seen;
 };
 
 #endif

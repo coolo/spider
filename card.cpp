@@ -1,5 +1,6 @@
 #include "card.h"
 #include <QDebug>
+#include <QString>
 
 QString Card::toString() const
 {
@@ -104,4 +105,15 @@ Rank Card::char2rank(char c)
     qDebug() << "No map for " << c;
     exit(1);
     return Ace;
+}
+
+Card::Card(QString token)
+{
+    faceup = !token.startsWith('|');
+    if (!faceup)
+    {
+        token.remove(0, 1);
+    }
+    rank = char2rank(token[0].toLatin1());
+    suit = char2suit(token[1].toLatin1());
 }
