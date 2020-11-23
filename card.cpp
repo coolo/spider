@@ -46,7 +46,7 @@ QString Card::toString() const
         exit(1);
     }
     if (!faceup)
-        ret = "[" + ret + "]";
+        ret = "|" + ret;
     return ret;
 }
 

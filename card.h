@@ -1,3 +1,6 @@
+#ifndef _CARD_H_
+#define _CARD_H_ 1
+
 #include <QString>
 
 enum Suit
@@ -34,3 +37,5 @@ struct Card
     Suit char2suit(char c);
     Rank char2rank(char c);
 };
+
+#endif
