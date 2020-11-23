@@ -22,8 +22,10 @@ QString Card::toString() const
         ret += 'T';
         break;
     default:
-        if (rank < 2 || rank > 9)
+        if (rank < 2 || rank > 9) {
+            qDebug() << "rank is out of range";
             exit(1);
+        }
         ret += ('0' + rank);
         break;
     }

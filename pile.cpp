@@ -22,10 +22,11 @@ Pile *Pile::checkIfNew(Pile *newone)
 Pile *Pile::copyFrom(Pile *from, int index)
 {
     Pile *newone = new Pile(prefix);
-    newone->cards = cards;
+    memcpy(newone->cards, cards, sizeof(Card) * 104);
+    newone->count = count;
     for (int i = index; i < from->cardCount(); i++)
     {
-        newone->cards.append(from->at(i));
+        newone->cards[newone->count++] = from->at(i);
     }
     return checkIfNew(newone);
 }
@@ -33,9 +34,9 @@ Pile *Pile::copyFrom(Pile *from, int index)
 QString Pile::toString() const
 {
     QString ret = prefix;
-    for (Card c : cards)
+    for (int i = 0; i < count; i++)
     {
-        ret += " " + c.toString();
+        ret += " " + cards[i].toString();
     }
     return ret;
 }
@@ -43,9 +44,10 @@ QString Pile::toString() const
 Pile *Pile::remove(int index)
 {
     Pile *newone = new Pile(prefix);
-    newone->cards = cards;
-    while (newone->cards.size() > index)
-        newone->cards.removeLast();
+    memcpy(newone->cards, cards, sizeof(Card) * 104);
+    newone->count = count;
+    while (newone->count > index)
+        newone->count--;
     if (index > 0)
     {
         newone->cards[index - 1].faceup = true;
@@ -63,7 +65,7 @@ bool Pile::addCard(QString token)
     }
     newone.rank = newone.char2rank(token[0].toLatin1());
     newone.suit = newone.char2suit(token[1].toLatin1());
-    cards.append(newone);
+    cards[count++] = newone;
     calculateChaos();
     calculateId();
     return true;
@@ -72,8 +74,9 @@ bool Pile::addCard(QString token)
 Pile *Pile::newWithCard(const Card &c)
 {
     Pile *newone = new Pile(prefix);
-    newone->cards = cards;
-    newone->cards.append(c);
+    memcpy(newone->cards, cards, sizeof(Card) * 104);
+    newone->count = count;
+    newone->cards[newone->count++] = c;
     return checkIfNew(newone);
 }
 
@@ -83,9 +86,9 @@ void Pile::calculateId()
     // each can be represented by a byte
     char bytes[104];
     int index = 0;
-    for (Card c : cards)
+    for (int i = 0; i < count; i++)
     {
-        bytes[index++] = c.asByte();
+        bytes[index++] = cards[i].asByte();
     }
     m_id = SpookyHash::Hash64(bytes, index, 1);
 }
@@ -94,8 +97,9 @@ void Pile::calculateChaos()
 {
     m_chaos = 0;
     Card prev_card;
-    for (Card c : cards)
+    for (int i = 0; i < count; i++)
     {
+        Card c = cards[i];
         if (!c.faceup)
         {
             m_chaos += 50;

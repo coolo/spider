@@ -7,14 +7,14 @@
 class Pile
 {
 public:
-    Pile(QString _prefix) { prefix = _prefix; m_id = 0; m_chaos = 0; }
+    Pile(QString _prefix) { prefix = _prefix; m_id = 0; m_chaos = 0; count = 0; }
     bool addCard(QString token);
     Pile *newWithCard(const Card &c);
     QString toString() const;
     QString name() const { return prefix; }
-    bool empty() const { return cards.empty(); }
+    bool empty() const { return count == 0; }
     Card at(int index) const { return cards[index]; }
-    size_t cardCount() const { return cards.count(); }
+    size_t cardCount() const { return count; }
     Pile *remove(int index);
     Pile *copyFrom(Pile *from, int index);
     int chaos() const { return m_chaos; }
@@ -26,7 +26,8 @@ private:
     int m_chaos;
     uint64_t m_id;
     QString prefix;
-    QList<Card> cards;
+    Card cards[104];
+    size_t count;
     static Pile *checkIfNew(Pile *newone);
 };
 
