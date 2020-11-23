@@ -2,6 +2,7 @@
 #include "move.h"
 #include "pile.h"
 #include "card.h"
+#include "SpookyV2.h"
 #include <QList>
 #include <QDebug>
 
@@ -35,7 +36,7 @@ QList<Move> Deck::getMoves()
                 if (to == from)
                     continue;
                 //qDebug() << "trying to move " << (piles[from]->cardCount() - count) << " from " << from << " to " << to;
-                size_t to_count = piles[to]->cardCount() - 1;
+                int to_count = piles[to]->cardCount() - 1;
                 if (to_count > 0)
                 {
                     Card top_card = piles[to]->at(to_count);
@@ -92,10 +93,13 @@ Deck *Deck::applyMove(Move m)
         }
         // empty pile
         newone->piles[m.from] = new Pile(newone->piles[m.from]->name());
-        return newone;
     }
-    newone->piles[m.to] = newone->piles[m.to]->copyFrom(newone->piles[m.from], m.index);
-    newone->piles[m.from] = newone->piles[m.from]->remove(m.index);
+    else
+    {
+        newone->piles[m.to] = newone->piles[m.to]->copyFrom(newone->piles[m.from], m.index);
+        newone->piles[m.from] = newone->piles[m.from]->remove(m.index);
+    }
+    newone->calculateChaos();
     return newone;
 }
 
@@ -115,4 +119,28 @@ Pile *Deck::addPile(QString token)
     Pile *p = new Pile(token);
     piles.append(p);
     return p;
+}
+
+uint64_t Deck::id()
+{
+    uint64_t ids[16];
+    int counter = 0;
+    for (Pile *p : piles)
+    {
+        ids[counter++] = p->id();
+    }
+    return SpookyHash::Hash64(&ids, 16 * 8, 1);
+}
+
+void Deck::calculateChaos()
+{
+    m_chaos = 0;
+    for (int i = 0; i < 10; i++)
+        m_chaos += piles[i]->chaos();
+
+    for (int i = 10; i < 15; i++)
+    {
+        if (!piles[i]->empty())
+            m_chaos += 1000;
+    }
 }

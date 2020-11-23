@@ -1,4 +1,3 @@
-#include "SpookyV2.h"
 #include <QCommandLineParser>
 #include <QDebug>
 #include <QFile>
@@ -8,6 +7,11 @@
 #include "pile.h"
 #include "move.h"
 #include "deck.h"
+
+bool compare_chaos(Deck *v1, Deck *v2)
+{
+    return v1->chaos() < v2->chaos();
+}
 
 int main(int argc, char **argv)
 {
@@ -48,21 +52,41 @@ int main(int argc, char **argv)
             current_pile->addCard(token);
         }
     }
-    QList<Move> moves;
+    d.calculateChaos();
+    QList<Deck *> list;
+    QSet<uint64_t> seen;
+    list.append(&d);
+    int min_chaos = INT_MAX;
     do
     {
-        moves = d.getMoves();
-        std::random_shuffle(moves.begin(), moves.end());
+        std::sort(list.begin(), list.end(), compare_chaos);
+        d = *list.takeFirst();
+        QList<Move> moves = d.getMoves();
+        if (d.chaos() < min_chaos)
+        {
+            std::cout << std::endl
+                      << std::endl
+                      << min_chaos << d.toString().toStdString();
+            min_chaos = d.chaos();
+        }
         for (Move m : moves)
         {
-            
             //std::cout << std::endl << std::endl << d.toString().toStdString();
             //std::cout << d.explainMove(m).toStdString() << std::endl;
             Deck *newdeck = d.applyMove(m);
-            //std::cout << newdeck->toString().toStdString();
-            d = *newdeck;
-            break;
+            uint64_t id = newdeck->id();
+            //std::cout << newdeck->id() << " " << seen.contains(id) << std::endl;
+            if (!seen.contains(id))
+            {
+                seen.insert(id);
+                list.append(newdeck);
+                //qDebug() << newdeck->chaos() << list.count();
+            }
+            else
+            {
+                delete newdeck;
+            }
         }
-    } while (!moves.isEmpty());
+    } while (!list.empty());
     return 0;
 }

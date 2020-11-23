@@ -9,12 +9,19 @@
 class Deck
 {
 public:
+    Deck() { m_chaos = -17; }
     Pile *addPile(QString token);
     QList<Pile *> piles;
     QList<Move> getMoves();
     QString toString() const;
     QString explainMove(Move m);
     Deck *applyMove(Move m);
+    uint64_t id();
+    int chaos() const { return m_chaos; }
+    void calculateChaos();
+
+private:
+    int m_chaos;
 };
 
 #endif

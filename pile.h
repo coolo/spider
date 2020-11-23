@@ -18,12 +18,16 @@ public:
     Pile *remove(int index);
     Pile *copyFrom(Pile *from, int index);
     int chaos() const { return m_chaos; }
+    uint64_t id() const { return m_id; }
 
 private:
+    void calculateId();
     void calculateChaos();
     int m_chaos;
+    uint64_t m_id;
     QString prefix;
     QList<Card> cards;
+    static Pile *checkIfNew(Pile *newone);
 };
 
 #endif
