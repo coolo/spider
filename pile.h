@@ -7,7 +7,7 @@
 class Pile
 {
 public:
-    Pile(QString _prefix) { prefix = _prefix; }
+    Pile(QString _prefix) { prefix = _prefix; m_id = 0; m_chaos = 0; }
     bool addCard(QString token);
     Pile *newWithCard(const Card &c);
     QString toString() const;

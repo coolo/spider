@@ -3,12 +3,14 @@
 #include "SpookyV2.h"
 #include <QMap>
 
-static QMap<uint64_t, Pile*> seen;
+static QMap<uint64_t, Pile *> seen;
 
-Pile *Pile::checkIfNew(Pile *newone) {
+Pile *Pile::checkIfNew(Pile *newone)
+{
     newone->calculateId();
-    QMap<uint64_t, Pile*>::iterator seen_one = seen.find(newone->m_id);
-    if (seen_one != seen.end()) {
+    QMap<uint64_t, Pile *>::iterator seen_one = seen.find(newone->m_id);
+    if (seen_one != seen.end())
+    {
         delete newone;
         return *seen_one;
     }
@@ -83,7 +85,7 @@ void Pile::calculateId()
 
 void Pile::calculateChaos()
 {
-     m_chaos = 0;
+    m_chaos = 0;
     Card prev_card;
     for (Card c : cards)
     {

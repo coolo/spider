@@ -3,10 +3,20 @@
 #include <QFile>
 #include <QMessageLogger>
 #include <iostream>
+#include <queue>
 #include "card.h"
 #include "pile.h"
 #include "move.h"
 #include "deck.h"
+
+class Compare
+{
+public:
+    bool operator() (Deck *v1, Deck *v2)
+    {
+        return v1->chaos() > v2->chaos();
+    }
+};
 
 bool compare_chaos(Deck *v1, Deck *v2)
 {
@@ -53,21 +63,23 @@ int main(int argc, char **argv)
         }
     }
     d.calculateChaos();
-    QList<Deck *> list;
+    std::priority_queue<Deck *,std::vector<Deck*>, Compare> list;
     QSet<uint64_t> seen;
-    list.append(&d);
+    list.push(&d);
     int min_chaos = INT_MAX;
     do
     {
-        std::sort(list.begin(), list.end(), compare_chaos);
-        d = *list.takeFirst();
+        //std::sort(list.begin(), list.end(), compare_chaos);
+        d = *list.top();
+        list.pop();
+        //qDebug() << d.chaos();
         QList<Move> moves = d.getMoves();
         if (d.chaos() < min_chaos)
         {
+            min_chaos = d.chaos();
             std::cout << std::endl
                       << std::endl
-                      << min_chaos << d.toString().toStdString();
-            min_chaos = d.chaos();
+                      << min_chaos << std::endl << d.toString().toStdString();
         }
         for (Move m : moves)
         {
@@ -75,11 +87,12 @@ int main(int argc, char **argv)
             //std::cout << d.explainMove(m).toStdString() << std::endl;
             Deck *newdeck = d.applyMove(m);
             uint64_t id = newdeck->id();
+            //std::cout << std::endl << std::endl << newdeck->toString().toStdString();
             //std::cout << newdeck->id() << " " << seen.contains(id) << std::endl;
             if (!seen.contains(id))
             {
                 seen.insert(id);
-                list.append(newdeck);
+                list.push(newdeck);
                 //qDebug() << newdeck->chaos() << list.count();
             }
             else
@@ -87,6 +100,6 @@ int main(int argc, char **argv)
                 delete newdeck;
             }
         }
-    } while (!list.empty());
+    } while (!list.empty() && min_chaos > 0);
     return 0;
 }
