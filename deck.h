@@ -11,7 +11,6 @@ class Deck
 public:
     Deck() { m_chaos = -17; }
     void addPile(Card *cards, size_t count);
-    QList<Pile *> piles;
     QList<Move> getMoves();
     QString toString() const;
     QString explainMove(Move m);
@@ -21,6 +20,7 @@ public:
     void calculateChaos();
 
 private:
+    QList<Pile *> piles;
     int m_chaos;
 };
 
