@@ -40,6 +40,7 @@ QList<Move> Deck::getMoves()
                 ret.last().index = index;
                 continue;
             }
+            bool moved_to_empty = false;
             for (int to = 0; to < 10; to++)
             {
                 if (to == from)
@@ -50,11 +51,17 @@ QList<Move> Deck::getMoves()
                 {
                     Card top_card = piles[to]->at(to_count);
                     if (top_card.rank != top_rank + 1)
-                    {
-                        //qDebug() << "no match";
                         continue;
-                    }
                 }
+                else if (moved_to_empty)
+                {
+                    continue;
+                }
+                else
+                {
+                    moved_to_empty = true;
+                }
+
                 ret.append(Move());
                 ret.last().from = from;
                 ret.last().to = to;
@@ -88,13 +95,18 @@ QString Deck::explainMove(Move m)
         return QString("Move a sequence from %1 to the off").arg(m.from);
     }
     QString fromCard = piles[m.from]->at(m.index).toString();
-    QString toCard = piles[m.to]->at(piles[m.to]->cardCount() - 1).toString();
+    QString toCard = "Empty";
+    if (piles[m.to]->cardCount() > 0)
+        toCard = piles[m.to]->at(piles[m.to]->cardCount() - 1).toString();
     return QString("Move %1 cards from %2 to %3 - %4->%5").arg(piles[m.from]->cardCount() - m.index).arg(m.from).arg(m.to).arg(fromCard).arg(toCard);
 }
 
 Deck *Deck::applyMove(Move m)
 {
     Deck *newone = new Deck;
+    newone->m_moves = m_moves + 1;
+    newone->order = order;
+    newone->order.append(m);
     newone->piles = piles;
     if (m.talon)
     {
@@ -105,7 +117,7 @@ Deck *Deck::applyMove(Move m)
             newone->piles[9 - to] = newone->piles[9 - to]->newWithCard(c);
         }
         // empty pile
-        newone->piles[m.from] = Pile::createPile(0,0);
+        newone->piles[m.from] = Pile::createPile(0, 0);
     }
     else if (m.off)
     {
@@ -134,7 +146,7 @@ QString Deck::toString() const
         }
         else if (counter < 15)
         {
-            ret += QString("Deck%1:").arg(counter - 10);
+            ret += QString("Deal%1:").arg(counter - 10);
         }
         else
             ret += "Off:";
@@ -148,7 +160,7 @@ QString Deck::toString() const
 
 void Deck::addPile(Card *cards, size_t count)
 {
-    piles.append(Pile::createPile(cards,count));
+    piles.append(Pile::createPile(cards, count));
 }
 
 uint64_t Deck::id()
@@ -172,6 +184,6 @@ void Deck::calculateChaos()
     for (int i = 10; i < 15; i++)
     {
         if (!piles[i]->empty())
-            m_chaos += 100;
+            m_chaos += 11;
     }
 }

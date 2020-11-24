@@ -9,7 +9,11 @@
 class Deck
 {
 public:
-    Deck() { m_chaos = -17; }
+    Deck()
+    {
+        m_chaos = -17;
+        m_moves = 0;
+    }
     void addPile(Card *cards, size_t count);
     QList<Move> getMoves();
     QString toString() const;
@@ -17,10 +21,14 @@ public:
     Deck *applyMove(Move m);
     uint64_t id();
     int chaos() const { return m_chaos; }
+    int moves() const { return m_moves; }
     void calculateChaos();
+    QList<Move> order;
 
 private:
     QList<Pile *> piles;
+
+    int m_moves;
     int m_chaos;
 };
 

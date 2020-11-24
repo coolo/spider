@@ -47,6 +47,7 @@ QString Pile::toString() const
     {
         ret += " " + cards[i].toString();
     }
+    ret += QString(" (%1)").arg(m_chaos);
     return ret;
 }
 
@@ -77,28 +78,29 @@ void Pile::calculateChaos()
 {
     m_chaos = 0;
     Card prev_card;
-    for (int i = 0; i < count; i++)
+    int index = count;
+    while (--index >= 0)
     {
-        Card c = cards[i];
+        Card c = cards[index];
         if (!c.faceup)
         {
-            m_chaos += 50;
+            m_chaos += 2;
         }
         else if (prev_card.rank != None)
         {
-            if (prev_card.suit != c.suit)
-                m_chaos += 5;
-            if (prev_card.rank <= c.rank)
-                m_chaos += 3 * (c.rank - prev_card.rank + 1);
-            else if (c.rank == prev_card.rank - 1)
-                m_chaos += 1;
+            if (c.suit == prev_card.suit && c.rank == prev_card.rank + 1)
+                m_chaos += 0;
             else
-                m_chaos += 3;
+            {
+                if (c.rank < prev_card.rank)
+                    m_chaos += 2;
+                else
+                    m_chaos += 1;
+            }
         }
-        else // first card face up
+        else
         {
-            // first card king is least chaos
-            m_chaos += (13 - c.rank) + 1;
+            m_chaos += 1;
         }
         prev_card = c;
     }

@@ -14,7 +14,7 @@ class ChaosCompare
 public:
     bool operator()(Deck *v1, Deck *v2)
     {
-        return v1->chaos() > v2->chaos();
+        return v1->chaos() + v1->moves() > v2->chaos() + v2->moves();
     }
 };
 
@@ -63,8 +63,9 @@ int main(int argc, char **argv)
     }
     d->addPile(cards, count);
     d->calculateChaos();
+    Deck orig = *d;
     std::priority_queue<Deck *, std::vector<Deck *>, ChaosCompare> list;
-    QSet<uint64_t> seen;
+    QMap<uint64_t, int> seen;
     list.push(d);
     int min_chaos = INT_MAX;
     do
@@ -78,26 +79,51 @@ int main(int argc, char **argv)
             min_chaos = d->chaos();
             std::cout << std::endl
                       << std::endl
-                      << min_chaos << std::endl
+                      << min_chaos << " " << d->moves() << std::endl
                       << d->toString().toStdString();
+            if (!min_chaos) {
+                
+                for (Move m: d->order) {
+                    std::cout << orig.toString().toStdString() << std::endl;
+                    std::cout << orig.explainMove(m).toStdString() << std::endl;
+                    orig = *orig.applyMove(m);
+                    
+                }
+            }
         }
+        int improved_chaos = 0;
         for (Move m : moves)
         {
-            //std::cout << std::endl << std::endl << d.toString().toStdString();
-            //std::cout << d.explainMove(m).toStdString() << std::endl;
+            //std::cout << std::endl << std::endl << d->chaos() << std::endl << d->toString().toStdString();
+            //std::cout << d->explainMove(m).toStdString() << std::endl;
             Deck *newdeck = d->applyMove(m);
+            //std::cout << "new chaos " << newdeck->chaos() << std::endl << newdeck->toString().toStdString() << std::endl;
+            if (newdeck->chaos() < d->chaos())
+            {
+                improved_chaos++;
+            }
+            else if (improved_chaos > 0)
+            {
+                //std::cout << "skip\n";
+                delete newdeck;
+                continue;
+            }
             uint64_t id = newdeck->id();
             //std::cout << std::endl << std::endl << newdeck->toString().toStdString();
             //std::cout << newdeck->id() << " " << seen.contains(id) << std::endl;
             if (!seen.contains(id))
             {
-                seen.insert(id);
+                seen.insert(id, newdeck->moves());
+
                 list.push(newdeck);
                 //qDebug() << newdeck->chaos() << list.size();
-                const int max_elements = 100000;
+                const int max_elements = 300000;
                 if (list.size() > max_elements)
                 {
-                    //qDebug() << "reduce" << seen.size();
+                    qDebug() << "reduce" << seen.size();
+                    std::cout << std::endl
+                              << std::endl
+                              << newdeck->toString().toStdString();
                     std::vector<Deck *> tmp;
                     for (int i = 0; i < max_elements / 2; i++)
                     {
@@ -117,6 +143,8 @@ int main(int argc, char **argv)
             }
             else
             {
+                if (newdeck->moves() < seen[id])
+                    seen[id] = newdeck->moves();
                 delete newdeck;
             }
         }
