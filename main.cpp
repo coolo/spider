@@ -82,32 +82,22 @@ int main(int argc, char **argv)
                       << min_chaos << " " << d->moves() << std::endl
                       << d->toString().toStdString();
             if (!min_chaos) {
-                
+                int counter = 1;
                 for (Move m: d->order) {
-                    std::cout << orig.toString().toStdString() << std::endl;
-                    std::cout << orig.explainMove(m).toStdString() << std::endl;
+                    //std::cout << orig.toString().toStdString() << std::endl;
+                    if (!m.off)
+                        std::cout << QString("%1").arg(counter++).toStdString() << " " << orig.explainMove(m).toStdString() << std::endl;
                     orig = *orig.applyMove(m);
                     
                 }
             }
         }
-        int improved_chaos = 0;
         for (Move m : moves)
         {
             //std::cout << std::endl << std::endl << d->chaos() << std::endl << d->toString().toStdString();
             //std::cout << d->explainMove(m).toStdString() << std::endl;
             Deck *newdeck = d->applyMove(m);
             //std::cout << "new chaos " << newdeck->chaos() << std::endl << newdeck->toString().toStdString() << std::endl;
-            if (newdeck->chaos() < d->chaos())
-            {
-                improved_chaos++;
-            }
-            else if (improved_chaos > 0)
-            {
-                //std::cout << "skip\n";
-                delete newdeck;
-                continue;
-            }
             uint64_t id = newdeck->id();
             //std::cout << std::endl << std::endl << newdeck->toString().toStdString();
             //std::cout << newdeck->id() << " " << seen.contains(id) << std::endl;
@@ -117,7 +107,7 @@ int main(int argc, char **argv)
 
                 list.push(newdeck);
                 //qDebug() << newdeck->chaos() << list.size();
-                const int max_elements = 300000;
+                const int max_elements = 800000;
                 if (list.size() > max_elements)
                 {
                     qDebug() << "reduce" << seen.size();

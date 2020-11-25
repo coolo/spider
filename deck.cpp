@@ -8,13 +8,26 @@
 
 QList<Move> Deck::getMoves()
 {
+    bool talons_done = true;
+    for (int i = 10; i < 15; i++)
+    {
+        if (!piles[i]->empty())
+        {
+            talons_done = false;
+            break;
+        }
+    }
+
     QList<Move> ret;
     int from = 0;
+    bool one_is_empty = false;
     for (; from < 10; from++)
     {
         //qDebug() << "Play" << piles[from]->toString();
-        if (piles[from]->empty())
+        if (piles[from]->empty()) {
+            one_is_empty = true;
             continue;
+        }
 
         int index = piles[from]->cardCount() - 1;
         Suit top_suit = piles[from]->at(index).suit;
@@ -33,12 +46,13 @@ QList<Move> Deck::getMoves()
 
             if (piles[from]->cardCount() - index == 13)
             {
+                ret.clear();
                 ret.append(Move());
                 ret.last().from = from;
                 ret.last().to = 0;
                 ret.last().off = true;
                 ret.last().index = index;
-                continue;
+                return ret;
             }
             bool moved_to_empty = false;
             for (int to = 0; to < 10; to++)
@@ -46,16 +60,17 @@ QList<Move> Deck::getMoves()
                 if (to == from)
                     continue;
                 //qDebug() << "trying to move " << (piles[from]->cardCount() - index) << " from " << from << " to " << to;
-                int to_count = piles[to]->cardCount() - 1;
+                int to_count = piles[to]->cardCount();
                 if (to_count > 0)
                 {
-                    Card top_card = piles[to]->at(to_count);
+                    Card top_card = piles[to]->at(to_count - 1);
                     if (top_card.rank != top_rank + 1)
                         continue;
                 }
                 else if (moved_to_empty)
                 {
-                    continue;
+                    if (talons_done)
+                        continue;
                 }
                 else
                 {
@@ -70,6 +85,9 @@ QList<Move> Deck::getMoves()
             index--;
         }
     }
+    if (one_is_empty)
+        return ret;
+
     from = 10;
     for (; from < 15; from++)
     {
@@ -92,13 +110,13 @@ QString Deck::explainMove(Move m)
     }
     if (m.off)
     {
-        return QString("Move a sequence from %1 to the off").arg(m.from);
+        return QString("Move a sequence from %1 to the off").arg(m.from + 1);
     }
     QString fromCard = piles[m.from]->at(m.index).toString();
     QString toCard = "Empty";
     if (piles[m.to]->cardCount() > 0)
         toCard = piles[m.to]->at(piles[m.to]->cardCount() - 1).toString();
-    return QString("Move %1 cards from %2 to %3 - %4->%5").arg(piles[m.from]->cardCount() - m.index).arg(m.from).arg(m.to).arg(fromCard).arg(toCard);
+    return QString("Move %1 cards from %2 to %3 - %4->%5").arg(piles[m.from]->cardCount() - m.index).arg(m.from + 1).arg(m.to + 1).arg(fromCard).arg(toCard);
 }
 
 Deck *Deck::applyMove(Move m)
@@ -114,7 +132,7 @@ Deck *Deck::applyMove(Move m)
         {
             Card c = newone->piles[m.from]->at(to);
             c.faceup = true;
-            newone->piles[9 - to] = newone->piles[9 - to]->newWithCard(c);
+            newone->piles[to] = newone->piles[to]->newWithCard(c);
         }
         // empty pile
         newone->piles[m.from] = Pile::createPile(0, 0);
@@ -184,6 +202,6 @@ void Deck::calculateChaos()
     for (int i = 10; i < 15; i++)
     {
         if (!piles[i]->empty())
-            m_chaos += 11;
+            m_chaos += 9;
     }
 }
