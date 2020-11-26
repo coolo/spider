@@ -1,24 +1,23 @@
+#include "card.h"
+#include "deck.h"
+#include "move.h"
+#include "pile.h"
 #include <QCommandLineParser>
 #include <QDebug>
 #include <QFile>
 #include <QMessageLogger>
 #include <iostream>
 #include <queue>
-#include "card.h"
-#include "pile.h"
-#include "move.h"
-#include "deck.h"
 
-class ChaosCompare
-{
+class ChaosCompare {
 public:
-    bool operator()(Deck *v1, Deck *v2)
+    bool operator()(Deck* v1, Deck* v2)
     {
         return v1->chaos() + v1->moves() > v2->chaos() + v2->moves();
     }
 };
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     QCoreApplication app(argc, argv);
     QCoreApplication::setApplicationName("spider");
@@ -41,22 +40,18 @@ int main(int argc, char **argv)
         return 1;
 
     QTextStream ts(&file);
-    Deck *d = new Deck();
+    Deck* d = new Deck();
     Card cards[104];
     int count = -1;
-    while (!ts.atEnd())
-    {
+    while (!ts.atEnd()) {
         QString token;
         ts >> token;
 
-        if (token.startsWith("Play") || token.startsWith("Deal") || token.startsWith("Off"))
-        {
+        if (token.startsWith("Play") || token.startsWith("Deal") || token.startsWith("Off")) {
             if (count >= 0)
                 d->addPile(cards, count);
             count = 0;
-        }
-        else if (!token.isEmpty())
-        {
+        } else if (!token.isEmpty()) {
             Card c(token);
             cards[count++] = c;
         }
@@ -64,18 +59,21 @@ int main(int argc, char **argv)
     d->addPile(cards, count);
     d->calculateChaos();
     Deck orig = *d;
-    std::priority_queue<Deck *, std::vector<Deck *>, ChaosCompare> list;
+    std::priority_queue<Deck*, std::vector<Deck*>, ChaosCompare> lists[6];
     QMap<uint64_t, int> seen;
-    list.push(d);
+    lists[d->leftTalons()].push(d);
     int min_chaos = INT_MAX;
-    do
-    {
-        d = list.top();
-        list.pop();
+    int roundrobin = 0;
+    do {
+        if (lists[roundrobin].empty()) {
+            roundrobin = (roundrobin + 1) % 6;
+            continue;
+        }
+        d = lists[roundrobin].top();
+        lists[roundrobin].pop();
         //qDebug() << d.chaos();
         QList<Move> moves = d->getMoves();
-        if (d->chaos() < min_chaos)
-        {
+        if (d->chaos() < min_chaos) {
             min_chaos = d->chaos();
             std::cout << std::endl
                       << std::endl
@@ -83,67 +81,61 @@ int main(int argc, char **argv)
                       << d->toString().toStdString();
             if (!min_chaos) {
                 int counter = 1;
-                for (Move m: d->order) {
-                    //std::cout << orig.toString().toStdString() << std::endl;
+                for (Move m : d->order) {
+                    std::cout << orig.toString().toStdString() << std::endl;
                     if (!m.off)
                         std::cout << QString("%1").arg(counter++).toStdString() << " " << orig.explainMove(m).toStdString() << std::endl;
                     orig = *orig.applyMove(m);
-                    
                 }
             }
         }
-        for (Move m : moves)
-        {
+        for (Move m : moves) {
             //std::cout << std::endl << std::endl << d->chaos() << std::endl << d->toString().toStdString();
             //std::cout << d->explainMove(m).toStdString() << std::endl;
-            Deck *newdeck = d->applyMove(m);
+            Deck* newdeck = d->applyMove(m);
             //std::cout << "new chaos " << newdeck->chaos() << std::endl << newdeck->toString().toStdString() << std::endl;
             uint64_t id = newdeck->id();
             //std::cout << std::endl << std::endl << newdeck->toString().toStdString();
             //std::cout << newdeck->id() << " " << seen.contains(id) << std::endl;
-            if (!seen.contains(id))
-            {
+            if (!seen.contains(id)) {
                 seen.insert(id, newdeck->moves());
 
-                list.push(newdeck);
+                lists[newdeck->leftTalons()].push(newdeck);
                 //qDebug() << newdeck->chaos() << list.size();
                 const int max_elements = 800000;
-                if (list.size() > max_elements)
-                {
+                if (lists[roundrobin].size() > max_elements) {
                     qDebug() << "reduce" << seen.size();
                     std::cout << std::endl
                               << std::endl
                               << newdeck->toString().toStdString();
-                    std::vector<Deck *> tmp;
-                    for (int i = 0; i < max_elements / 2; i++)
-                    {
-                        tmp.push_back(list.top());
-                        list.pop();
+                    std::vector<Deck*> tmp;
+                    for (int i = 0; i < max_elements / 2; i++) {
+                        tmp.push_back(lists[roundrobin].top());
+                        lists[roundrobin].pop();
                     }
-                    while (!list.empty())
-                    {
-                        delete list.top();
-                        list.pop();
+                    while (!lists[roundrobin].empty()) {
+                        delete lists[roundrobin].top();
+                        lists[roundrobin].pop();
                     }
-                    list = std::priority_queue<Deck *, std::vector<Deck *>, ChaosCompare>();
-                    std::vector<Deck *>::iterator it = tmp.begin();
+                    lists[roundrobin] = std::priority_queue<Deck*, std::vector<Deck*>, ChaosCompare>();
+                    std::vector<Deck*>::iterator it = tmp.begin();
                     for (; it != tmp.end(); it++)
-                        list.push(*it);
+                        lists[roundrobin].push(*it);
                 }
-            }
-            else
-            {
+            } else {
                 if (newdeck->moves() < seen[id])
                     seen[id] = newdeck->moves();
                 delete newdeck;
             }
         }
         delete d;
-    } while (!list.empty() && min_chaos > 0);
-    while (!list.empty())
-    {
-        delete list.top();
-        list.pop();
+        roundrobin = (roundrobin + 1) % 6;
+    } while (min_chaos > 0);
+    for (int i = 0; i < 6; i++) {
+        while (!lists[i].empty()) {
+            delete lists[i].top();
+            lists[i].pop();
+        }
     }
     return 0;
 }

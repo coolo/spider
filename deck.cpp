@@ -122,7 +122,9 @@ QString Deck::explainMove(Move m)
 Deck *Deck::applyMove(Move m)
 {
     Deck *newone = new Deck;
-    newone->m_moves = m_moves + 1;
+    newone->m_moves = m_moves;
+    if (!m.off)
+       newone->m_moves += 1;
     newone->order = order;
     newone->order.append(m);
     newone->piles = piles;
@@ -195,13 +197,16 @@ uint64_t Deck::id()
 void Deck::calculateChaos()
 {
     m_chaos = 0;
+    m_talons = 0;
     for (int i = 0; i < 10; i++)
     {
         m_chaos += piles[i]->chaos();
     }
     for (int i = 10; i < 15; i++)
     {
-        if (!piles[i]->empty())
-            m_chaos += 9;
+        if (!piles[i]->empty()) {
+            m_talons++;
+            m_chaos += 8;
+        }
     }
 }

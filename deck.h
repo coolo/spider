@@ -22,6 +22,7 @@ public:
     uint64_t id();
     int chaos() const { return m_chaos; }
     int moves() const { return m_moves; }
+    int leftTalons() const { return m_talons; }
     void calculateChaos();
     QList<Move> order;
 
@@ -30,6 +31,7 @@ private:
 
     int m_moves;
     int m_chaos;
+    int m_talons;
 };
 
 #endif
