@@ -216,7 +216,7 @@ void Deck::calculateChaos()
     {
         if (!piles[i]->empty()) {
             m_talons++;
-            m_chaos += 10;
+            m_chaos += 1;
         }
     }
 }
