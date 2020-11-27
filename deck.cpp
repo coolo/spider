@@ -119,7 +119,7 @@ QString Deck::explainMove(Move m)
     return QString("Move %1 cards from %2 to %3 - %4->%5").arg(piles[m.from]->cardCount() - m.index).arg(m.from + 1).arg(m.to + 1).arg(fromCard).arg(toCard);
 }
 
-Deck *Deck::applyMove(Move m)
+Deck *Deck::applyMove(Move m, bool stop)
 {
     Deck *newone = new Deck;
     newone->m_moves = m_moves;
@@ -133,6 +133,9 @@ Deck *Deck::applyMove(Move m)
         for (int to = 0; to < 10; to++)
         {
             Card c = newone->piles[m.from]->at(to);
+            if (c.unknown && stop) {
+              exit(1); 
+            }
             c.faceup = true;
             newone->piles[to] = newone->piles[to]->newWithCard(c);
         }
@@ -149,6 +152,8 @@ Deck *Deck::applyMove(Move m)
     {
         newone->piles[m.to] = newone->piles[m.to]->copyFrom(newone->piles[m.from], m.index);
         newone->piles[m.from] = newone->piles[m.from]->remove(m.index);
+        if (stop && m.index > 0 && newone->piles[m.from]->at(m.index-1).unknown)
+          exit(1);
     }
     newone->calculateChaos();
     return newone;
@@ -194,6 +199,11 @@ uint64_t Deck::id()
     return SpookyHash::Hash64(&ids, 16 * 8, 1);
 }
 
+void Deck::assignLeftCards(QList<Card> &list) {
+    for (int i = 0; i < 15; i++)
+        piles[i] = piles[i]->assignLeftCards(list);
+}
+
 void Deck::calculateChaos()
 {
     m_chaos = 0;
@@ -206,7 +216,7 @@ void Deck::calculateChaos()
     {
         if (!piles[i]->empty()) {
             m_talons++;
-            m_chaos += 8;
+            m_chaos += 1;
         }
     }
 }

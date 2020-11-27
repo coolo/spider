@@ -4,6 +4,9 @@
 
 QString Card::toString() const
 {
+    if (unknown)
+       return "|XX";
+
     QString ret;
     switch (rank)
     {
@@ -21,6 +24,9 @@ QString Card::toString() const
         break;
     case Ten:
         ret += 'T';
+        break;
+    case None:
+        ret += 'N';
         break;
     default:
         if (rank < 2 || rank > 9) {
@@ -114,6 +120,18 @@ Card::Card(QString token)
     {
         token.remove(0, 1);
     }
+    if (token == "XX") {
+      rank = None;
+      suit = Spades;
+      unknown = true;
+      return;
+    }
+    unknown = false;
     rank = char2rank(token[0].toLatin1());
     suit = char2suit(token[1].toLatin1());
 }
+
+bool Card::operator==(const Card &rhs) const {
+   return suit == rhs.suit && rank == rhs.rank;
+}
+

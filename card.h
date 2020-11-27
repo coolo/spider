@@ -2,6 +2,7 @@
 #define _CARD_H_ 1
 
 #include <QString>
+#include <QDebug>
 
 enum Suit
 {
@@ -31,6 +32,7 @@ enum Rank
 struct Card
 {
     bool faceup;
+    bool unknown;
     Suit suit;
     Rank rank;
 
@@ -38,6 +40,7 @@ struct Card
     {
         faceup = false;
         rank = None;
+        unknown = true;
     }
     Card(QString token);
     QString toString() const;
@@ -45,6 +48,14 @@ struct Card
     Rank char2rank(char c);
     // 4 bits for rank, 2 bits for suit, 1 bit for faceup
     unsigned char asByte() { return rank + (suit << 4) + (faceup << 6); }
+    bool operator==(const Card &rhs) const;
 };
 
+inline QDebug operator<<(QDebug debug, const Card &c)
+{
+    QDebugStateSaver saver(debug);
+    debug.nospace() << c.toString();
+
+    return debug;
+}
 #endif

@@ -25,6 +25,7 @@ public:
     int chaos() const { return m_chaos; }
     uint64_t id() const { return m_id; }
     static Pile *createPile(Card *cards, size_t count);
+    Pile *assignLeftCards(QList<Card> &list);
 
 private:
     void calculateChaos();

@@ -42,6 +42,21 @@ int main(int argc, char** argv)
     QTextStream ts(&file);
     Deck* d = new Deck();
     Card cards[104];
+    QList<Card> required;
+    int game_type = 2;
+    for (int suit = 0; suit < 4; suit++) {
+        for (int r = Ace; r <= King; r++) {
+            Card c;
+            c.rank = (Rank)r;
+            if (game_type == 2) {
+                c.suit = suit % 2 ? Hearts : Spades;
+            } else {
+                c.suit = Spades;
+            }
+            required.append(c);
+            required.append(c);
+        }
+    }
     int count = -1;
     while (!ts.atEnd()) {
         QString token;
@@ -53,10 +68,13 @@ int main(int argc, char** argv)
             count = 0;
         } else if (!token.isEmpty()) {
             Card c(token);
+            required.removeOne(c);
             cards[count++] = c;
         }
     }
+    std::random_shuffle(required.begin(), required.end());
     d->addPile(cards, count);
+    d->assignLeftCards(required);
     d->calculateChaos();
     Deck orig = *d;
     std::priority_queue<Deck*, std::vector<Deck*>, ChaosCompare> lists[6];
@@ -85,7 +103,7 @@ int main(int argc, char** argv)
                     std::cout << orig.toString().toStdString() << std::endl;
                     if (!m.off)
                         std::cout << QString("%1").arg(counter++).toStdString() << " " << orig.explainMove(m).toStdString() << std::endl;
-                    orig = *orig.applyMove(m);
+                    orig = *orig.applyMove(m, true);
                 }
             }
         }
@@ -102,7 +120,7 @@ int main(int argc, char** argv)
 
                 lists[newdeck->leftTalons()].push(newdeck);
                 //qDebug() << newdeck->chaos() << list.size();
-                const int max_elements = 800000;
+                const int max_elements = 80000;
                 if (lists[roundrobin].size() > max_elements) {
                     qDebug() << "reduce" << seen.size();
                     std::cout << std::endl

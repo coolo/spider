@@ -18,13 +18,14 @@ public:
     QList<Move> getMoves();
     QString toString() const;
     QString explainMove(Move m);
-    Deck *applyMove(Move m);
+    Deck *applyMove(Move m, bool stop = false);
     uint64_t id();
     int chaos() const { return m_chaos; }
     int moves() const { return m_moves; }
     int leftTalons() const { return m_talons; }
     void calculateChaos();
     QList<Move> order;
+    void assignLeftCards(QList<Card> &list);
 
 private:
     QList<Pile *> piles;
