@@ -83,10 +83,9 @@ int main(int argc, char** argv)
     int min_chaos = INT_MAX;
     int roundrobin = 0;
     do {
-        if (lists[roundrobin].empty()) {
-            roundrobin = (roundrobin + 1) % 6;
-            continue;
-        }
+        if (lists[roundrobin].empty()) 
+            goto nextlist;
+
         d = lists[roundrobin].top();
         lists[roundrobin].pop();
         //qDebug() << d.chaos();
@@ -100,7 +99,7 @@ int main(int argc, char** argv)
             if (!min_chaos) {
                 int counter = 1;
                 for (Move m : d->order) {
-                    std::cout << orig.toString().toStdString() << std::endl;
+                    //std::cout << orig.toString().toStdString() << std::endl;
                     if (!m.off)
                         std::cout << QString("%1").arg(counter++).toStdString() << " " << orig.explainMove(m).toStdString() << std::endl;
                     orig = *orig.applyMove(m, true);
@@ -120,7 +119,7 @@ int main(int argc, char** argv)
 
                 lists[newdeck->leftTalons()].push(newdeck);
                 //qDebug() << newdeck->chaos() << list.size();
-                const int max_elements = 80000;
+                const int max_elements = 300000;
                 if (lists[roundrobin].size() > max_elements) {
                     qDebug() << "reduce" << seen.size();
                     std::cout << std::endl
@@ -147,7 +146,9 @@ int main(int argc, char** argv)
             }
         }
         delete d;
-        roundrobin = (roundrobin + 1) % 6;
+
+    nextlist: 
+        roundrobin = rand() % 6;
     } while (min_chaos > 0);
     for (int i = 0; i < 6; i++) {
         while (!lists[i].empty()) {
