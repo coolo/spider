@@ -54,7 +54,11 @@ Deck *moveAlong(DeckList *lists, int roundrobin, int &min_chaos, QMap<uint64_t, 
         {
             seen.insert(id, newdeck->moves());
 
+#if 1
             lists[newdeck->leftTalons()].push(newdeck);
+#else
+            lists[0].push(newdeck);
+#endif
             //qDebug() << newdeck->chaos() << list.size();
             const int max_elements = 300000;
             if (lists[roundrobin].size() > max_elements)
@@ -152,9 +156,36 @@ int main(int argc, char **argv)
         }
         else if (!token.isEmpty())
         {
-            Card c(token);
-            required.removeOne(c);
-            cards[count++] = c;
+            if (token.length() == 6)
+            {
+                Card first(token.mid(0, 2));
+                Q_ASSERT(token.mid(2, 2) == "..");
+                //if (token.mid(2,4))
+                Card last(token.mid(4, 2));
+                while (first.rank >= last.rank)
+                {
+                    required.removeOne(first);
+                    cards[count++] = first;
+                    first.rank = (Rank)(first.rank - 1);
+                }
+            }
+            else
+            {
+                Card c(token);
+                if (d->pilesAdded() == 15)
+                {
+                    for (int rank = Ace; rank <= King; rank++)
+                    {
+                        c.rank = (Rank)rank;
+                        required.removeOne(c);
+                    }
+                }
+                else
+                {
+                    required.removeOne(c);
+                }
+                cards[count++] = c;
+            }
         }
     }
     // take this with standard seed
@@ -162,7 +193,9 @@ int main(int argc, char **argv)
     srand(time(0));
     d->addPile(cards, count);
     d->assignLeftCards(required);
+    Q_ASSERT(required.empty());
     d->calculateChaos();
+    std::cout << d->toString().toStdString() << std::endl;
     Deck orig = *d;
     DeckList lists[6];
     QMap<uint64_t, int> seen;
@@ -183,8 +216,16 @@ int main(int argc, char **argv)
                 orig = *orig.applyMove(m, true);
             }
         }
-        if (lists[roundrobin].empty() || (rand () % lists[roundrobin].size() < 5))
+        if (lists[roundrobin].empty() || (rand() % lists[roundrobin].size() < 5))
             roundrobin = (roundrobin + 1) % 6;
+        int sum = 0;
+        for (int i = 0; i < 6; i++)
+           sum += lists[i].size();
+        if (!sum)
+         {
+             qDebug() << "ran out of options";
+             break;
+         }
     } while (min_chaos > 0);
     for (int i = 0; i < 6; i++)
     {

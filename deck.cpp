@@ -4,7 +4,9 @@
 #include "card.h"
 #include "SpookyV2.h"
 #include <QList>
+#include <QFile>
 #include <QDebug>
+#include <iostream>
 
 QList<Move> Deck::getMoves()
 {
@@ -24,7 +26,8 @@ QList<Move> Deck::getMoves()
     for (; from < 10; from++)
     {
         //qDebug() << "Play" << piles[from]->toString();
-        if (piles[from]->empty()) {
+        if (piles[from]->empty())
+        {
             one_is_empty = true;
             continue;
         }
@@ -124,7 +127,7 @@ Deck *Deck::applyMove(Move m, bool stop)
     Deck *newone = new Deck;
     newone->m_moves = m_moves;
     if (!m.off)
-       newone->m_moves += 1;
+        newone->m_moves += 1;
     newone->order = order;
     newone->order.append(m);
     newone->piles = piles;
@@ -133,9 +136,6 @@ Deck *Deck::applyMove(Move m, bool stop)
         for (int to = 0; to < 10; to++)
         {
             Card c = newone->piles[m.from]->at(to);
-            if (c.unknown && stop) {
-              exit(1); 
-            }
             c.faceup = true;
             newone->piles[to] = newone->piles[to]->newWithCard(c);
         }
@@ -152,8 +152,14 @@ Deck *Deck::applyMove(Move m, bool stop)
     {
         newone->piles[m.to] = newone->piles[m.to]->copyFrom(newone->piles[m.from], m.index);
         newone->piles[m.from] = newone->piles[m.from]->remove(m.index);
-        if (stop && m.index > 0 && newone->piles[m.from]->at(m.index-1).unknown)
-          exit(1);
+        if (stop && m.index > 0 && newone->piles[m.from]->at(m.index - 1).unknown)
+        {
+            QFile file("tmp");
+            file.open(QIODevice::WriteOnly);
+            file.write(newone->toString().toUtf8());
+            file.close();
+            exit(1);
+        }
     }
     newone->calculateChaos();
     return newone;
@@ -199,7 +205,8 @@ uint64_t Deck::id()
     return SpookyHash::Hash64(&ids, 16 * 8, 1);
 }
 
-void Deck::assignLeftCards(QList<Card> &list) {
+void Deck::assignLeftCards(QList<Card> &list)
+{
     for (int i = 0; i < 15; i++)
         piles[i] = piles[i]->assignLeftCards(list);
 }
@@ -214,9 +221,10 @@ void Deck::calculateChaos()
     }
     for (int i = 10; i < 15; i++)
     {
-        if (!piles[i]->empty()) {
+        if (!piles[i]->empty())
+        {
             m_talons++;
-            m_chaos += 1;
+            m_chaos += 11;
         }
     }
 }

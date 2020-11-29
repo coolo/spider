@@ -4,6 +4,8 @@
 
 QString Card::toString() const
 {
+    if (unknown && faceup)
+        return "XX";
     if (unknown)
        return "|XX";
 

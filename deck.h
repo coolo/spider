@@ -26,6 +26,7 @@ public:
     void calculateChaos();
     QList<Move> order;
     void assignLeftCards(QList<Card> &list);
+    int pilesAdded() const { return piles.size(); }
 
 private:
     QList<Pile *> piles;
