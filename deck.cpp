@@ -88,20 +88,23 @@ QList<Move> Deck::getMoves()
             index--;
         }
     }
-    if (one_is_empty)
-        return ret;
-
-    from = 10;
-    for (; from < 15; from++)
+    if (!one_is_empty)
     {
-        if (!piles[from]->empty())
+
+        from = 10;
+        for (; from < 15; from++)
         {
-            ret.append(Move());
-            ret.last().from = from;
-            ret.last().talon = true;
-            break;
+            if (!piles[from]->empty())
+            {
+                ret.append(Move());
+                ret.last().from = from;
+                ret.last().talon = true;
+                break;
+            }
         }
     }
+    //qDebug() << ret.size() << "moves are possible";
+    //std::cerr << toString().toStdString() << std::endl;
     return ret;
 }
 
@@ -127,7 +130,10 @@ Deck *Deck::applyMove(Move m, bool stop)
     Deck *newone = new Deck;
     newone->m_moves = m_moves;
     if (!m.off)
+    {
         newone->m_moves += 1;
+        //qDebug() << newone->m_moves;
+    }
     newone->order = order;
     newone->order.append(m);
     newone->piles = piles;
@@ -154,6 +160,11 @@ Deck *Deck::applyMove(Move m, bool stop)
         newone->piles[m.from] = newone->piles[m.from]->remove(m.index);
         if (stop && m.index > 0 && newone->piles[m.from]->at(m.index - 1).unknown)
         {
+            std::cout << "What's up?" << std::endl;
+            std::string line;
+            std::getline(std::cin, line);
+            Card c(QString::fromStdString(line));
+            newone->piles[m.from] = newone->piles[m.from]->replaceAt(m.index - 1, c);
             QFile file("tmp");
             file.open(QIODevice::WriteOnly);
             file.write(newone->toString().toUtf8());

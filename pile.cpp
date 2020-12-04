@@ -3,21 +3,23 @@
 #include <QDebug>
 #include <QMap>
 
-QMap<uint64_t, Pile*> Pile::seen;
+QMap<uint64_t, Pile *> Pile::seen;
 
-Pile* Pile::createPile(Card* newcards, size_t newcount)
+Pile *Pile::createPile(Card *newcards, size_t newcount)
 {
     char bytes[104];
     int index = 0;
-    for (int i = 0; i < newcount; i++) {
+    for (int i = 0; i < newcount; i++)
+    {
         bytes[index++] = newcards[i].asByte();
     }
     uint64_t id = SpookyHash::Hash64(bytes, index, 1);
-    QMap<uint64_t, Pile*>::iterator seen_one = seen.find(id);
-    if (seen_one != seen.end()) {
+    QMap<uint64_t, Pile *>::iterator seen_one = seen.find(id);
+    if (seen_one != seen.end())
+    {
         return *seen_one;
     }
-    Pile* newone = new Pile();
+    Pile *newone = new Pile();
     memcpy(newone->cards, newcards, sizeof(Card) * newcount);
     newone->count = newcount;
     newone->m_id = id;
@@ -26,12 +28,13 @@ Pile* Pile::createPile(Card* newcards, size_t newcount)
     return newone;
 }
 
-Pile* Pile::copyFrom(Pile* from, int index)
+Pile *Pile::copyFrom(Pile *from, int index)
 {
     static Card newcards[104];
     memcpy(newcards, cards, sizeof(Card) * 104);
     int newcount = count;
-    for (int i = index; i < from->cardCount(); i++) {
+    for (int i = index; i < from->cardCount(); i++)
+    {
         newcards[newcount++] = from->at(i);
     }
     return createPile(newcards, newcount);
@@ -40,26 +43,28 @@ Pile* Pile::copyFrom(Pile* from, int index)
 QString Pile::toString() const
 {
     QString ret;
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < count; i++)
+    {
         ret += " " + cards[i].toString();
     }
     return ret;
 }
 
-Pile* Pile::remove(int index)
+Pile *Pile::remove(int index)
 {
     static Card newcards[104];
     memcpy(newcards, cards, sizeof(Card) * count);
     size_t newcount = count;
     while (newcount > index)
         newcount--;
-    if (index > 0) {
+    if (index > 0)
+    {
         newcards[index - 1].faceup = true;
     }
     return createPile(newcards, newcount);
 }
 
-Pile* Pile::newWithCard(const Card& c)
+Pile *Pile::newWithCard(const Card &c)
 {
     static Card newcards[104];
     size_t newcount = count;
@@ -73,20 +78,27 @@ void Pile::calculateChaos()
     m_chaos = 0;
     Card prev_card;
     int index = count;
-    while (--index >= 0) {
+    while (--index >= 0)
+    {
         Card c = cards[index];
-        if (!c.faceup) {
+        if (!c.faceup)
+        {
             m_chaos += 2;
-        } else if (prev_card.rank != None) {
+        }
+        else if (prev_card.rank != None)
+        {
             if (c.suit == prev_card.suit && c.rank == prev_card.rank + 1)
                 m_chaos += 0;
-            else {
+            else
+            {
                 if (c.rank < prev_card.rank)
                     m_chaos += 2;
                 else
                     m_chaos += 1;
             }
-        } else {
+        }
+        else
+        {
             m_chaos += 1;
         }
         prev_card = c;
@@ -94,21 +106,32 @@ void Pile::calculateChaos()
     //qDebug() << seen.count() << QString("%1").arg(m_id, 16, 16, QLatin1Char('0')) << m_chaos << toString();
 }
 
-Pile* Pile::assignLeftCards(QList<Card>& list)
+Pile *Pile::assignLeftCards(QList<Card> &list)
 {
     bool taken = false;
     Card newcards[104];
     memcpy(newcards, cards, sizeof(Card) * count);
-    for (int index = 0; index < count; index++) {
-        if (cards[index].rank == None) {
+    for (int index = 0; index < count; index++)
+    {
+        if (cards[index].rank == None)
+        {
             Card c = list.takeFirst();
             c.faceup = newcards[index].faceup;
             newcards[index] = c;
             taken = true;
         }
     }
-    if (taken) {
+    if (taken)
+    {
         return createPile(newcards, count);
     }
     return this;
+}
+
+Pile *Pile::replaceAt(int index, const Card &c)
+{
+    Card newcards[104];
+    memcpy(newcards, cards, sizeof(Card) * count);
+    newcards[index] = c;
+    return createPile(newcards, count);
 }

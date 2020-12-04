@@ -32,7 +32,7 @@ Deck *moveAlong(DeckList *lists, int roundrobin, int &min_chaos, QMap<uint64_t, 
     if (d->chaos() < min_chaos)
     {
         min_chaos = d->chaos();
-#if 0
+#if 1
         std::cout << std::endl
                   << std::endl
                   << min_chaos << " " << d->moves() << std::endl
@@ -193,6 +193,10 @@ int main(int argc, char **argv)
     srand(time(0));
     d->addPile(cards, count);
     d->assignLeftCards(required);
+    if (!required.empty()) {
+	    for (int i = 0; i < required.size(); i++) required[i].unknown = false;
+	    qDebug() << required;
+    }
     Q_ASSERT(required.empty());
     d->calculateChaos();
     std::cout << d->toString().toStdString() << std::endl;

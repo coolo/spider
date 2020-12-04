@@ -22,6 +22,7 @@ public:
     size_t cardCount() const { return count; }
     Pile *remove(int index);
     Pile *copyFrom(Pile *from, int index);
+    Pile *replaceAt(int index, const Card &c);
     int chaos() const { return m_chaos; }
     uint64_t id() const { return m_id; }
     static Pile *createPile(Card *cards, size_t count);
