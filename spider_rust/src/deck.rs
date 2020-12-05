@@ -72,6 +72,11 @@ impl Deck {
         h.finish()
     }
 
+    pub fn is_won(&self, pilemap: &HashMap<u64, Pile>) -> bool {
+        let off = pilemap.get(&self.off).expect("valid pile");
+        off.count() == 8
+    }
+
     pub fn parse(contents: &String, pilemap: &mut HashMap<u64, Pile>) -> Deck {
         let mut newdeck = Deck {
             play: [0; 10],
@@ -173,6 +178,13 @@ impl Deck {
                     return vec;
                 }
 
+                if index > 1 {
+                    let next_card = from_pile.at(index - 1);
+                    if next_card.suit() == top_suit && next_card.rank() == top_rank + 1 {
+                        //println!("Skip");
+                        continue;
+                    }
+                }
                 let mut moved_to_empty = false;
 
                 for to in 0..10 {

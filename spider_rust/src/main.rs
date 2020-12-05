@@ -24,13 +24,16 @@ fn main() {
         match unvisted.pop_front() {
             None => break,
             Some(deck) => {
-                //println!("{}", deck.to_string(&pilemap));
-                println!(
-                    "Visited: {} unvisited: {} piles: {}",
-                    visited.len(),
-                    unvisted.len(),
-                    pilemap.len()
-                );
+                if (visited.len() % 1000 == 0) {
+                    println!("{}", deck.to_string(&pilemap));
+
+                    println!(
+                        "Visited: {} unvisited: {} piles: {}",
+                        visited.len(),
+                        unvisted.len(),
+                        pilemap.len()
+                    );
+                }
                 let moves = deck.get_moves(&pilemap);
                 for m in &moves {
                     //deck.explain_move(m, &pilemap);
@@ -38,6 +41,10 @@ fn main() {
                     let hash = newdeck.hash();
                     if !visited.contains(&hash) {
                         visited.insert(hash);
+                        if newdeck.is_won(&pilemap) {
+                            println!("WON!");
+                            break;
+                        }
                         unvisted.push_back(newdeck);
                     }
                 }
