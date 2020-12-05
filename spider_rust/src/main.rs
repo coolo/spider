@@ -13,4 +13,8 @@ fn main() {
     let mut pilemap: HashMap<u64, Pile> = HashMap::new();
     let deck = Deck::parse(&contents, &mut pilemap);
     println!("{}", deck.to_string(&pilemap));
+    let moves = deck.get_moves(&pilemap);
+    for m in &moves {
+        deck.explain_move(m, &pilemap);
+    }
 }

@@ -92,6 +92,12 @@ impl Pile {
         }
         Pile::or_insert(&newcards, newcount, hashmap)
     }
+    pub fn is_empty(&self) -> bool {
+        self.count == 0
+    }
+    pub fn count(&self) -> usize {
+        self.count
+    }
 }
 
 #[cfg(test)]
