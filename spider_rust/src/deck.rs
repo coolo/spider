@@ -128,7 +128,7 @@ impl Deck {
             let top_suit = top_card.suit();
             let mut top_rank = top_card.rank() - 1;
 
-            while index >= 0 {
+            while index > 0 {
                 let current = from_pile.at(index);
                 if !current.faceup() {
                     break;
@@ -230,33 +230,26 @@ impl Deck {
                 newdeck.play[to] = Pile::add_card(self.play[to], c, &mut pilemap);
             }
             newdeck.talon[m.from as usize] = Pile::parse("", &mut pilemap).unwrap();
+            return newdeck;
         }
-        /*
-        else if (m.off)
-        {
-            Card c = newone->piles[m.from]->at(newone->piles[m.from]->cardCount() - 13);
-            newone->piles[15] = newone->piles[15]->newWithCard(c);
-            newone->piles[m.from] = newone->piles[m.from]->remove(m.index);
+
+        if m.off {
+            let from_index = m.from as usize;
+            let from_pile = pilemap.get(&self.play[from_index]).expect("valid pile");
+            let c = from_pile.at(from_pile.count() - 13);
+            newdeck.off = Pile::add_card(self.off, c, &mut pilemap);
+            newdeck.play[m.from as usize] =
+                Pile::remove_cards(self.play[m.from as usize], m.index as usize, &mut pilemap);
+            return newdeck;
         }
-        else
-        {
-            newone->piles[m.to] = newone->piles[m.to]->copyFrom(newone->piles[m.from], m.index);
-            newone->piles[m.from] = newone->piles[m.from]->remove(m.index);
-            if (stop && m.index > 0 && newone->piles[m.from]->at(m.index - 1).unknown)
-            {
-                std::cout << "What's up?" << std::endl;
-                std::string line;
-                std::getline(std::cin, line);
-                Card c(QString::fromStdString(line));
-                newone->piles[m.from] = newone->piles[m.from]->replaceAt(m.index - 1, c);
-                QFile file("tmp");
-                file.open(QIODevice::WriteOnly);
-                file.write(newone->toString().toUtf8());
-                file.close();
-                exit(1);
-            }
-        }
-        */
+        newdeck.play[m.to as usize] = Pile::copy_from(
+            self.play[m.to as usize],
+            self.play[m.from as usize],
+            m.index as usize,
+            &mut pilemap,
+        );
+        newdeck.play[m.from as usize] =
+            Pile::remove_cards(self.play[m.from as usize], m.index as usize, &mut pilemap);
         newdeck
     }
 }

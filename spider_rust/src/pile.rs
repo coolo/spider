@@ -101,6 +101,23 @@ impl Pile {
         Pile::or_insert(&newcards, newcount, pilemap)
     }
 
+    pub fn copy_from(
+        pile: u64,
+        orig_pile: u64,
+        index: usize,
+        pilemap: &mut HashMap<u64, Pile>,
+    ) -> u64 {
+        let pile = pilemap.get(&pile).expect("valid pile");
+        let orig_pile = pilemap.get(&orig_pile).expect("valid pile");
+        let mut newcards = pile.cards.clone();
+        let mut newcount = pile.count;
+        for i in index..orig_pile.count() {
+            newcards[newcount] = orig_pile.at(i).value();
+            newcount += 1;
+        }
+        Pile::or_insert(&newcards, newcount, pilemap)
+    }
+
     pub fn is_empty(&self) -> bool {
         self.count == 0
     }
@@ -139,5 +156,17 @@ mod piletests {
         );
         // we can repeat the operation with the same result
         assert_eq!(Pile::remove_cards(pile1, 5, &mut hashmap), pile2);
+    }
+
+    #[test]
+    fn copy_from() {
+        let mut hashmap = HashMap::new();
+        let pile1 = Pile::parse("|AS |3S |AS |6S |3H 8S", &mut hashmap).expect("parsed");
+        let pile2 = Pile::parse("|TS 7S 6S", &mut hashmap).expect("parsed");
+        let new_pile = Pile::copy_from(pile1, pile2, 1, &mut hashmap);
+        assert_eq!(
+            hashmap.get(&new_pile).expect("valid pile").to_string(),
+            "|AS |3S |AS |6S |3H 8S 7S 6S"
+        );
     }
 }
