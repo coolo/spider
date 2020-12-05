@@ -1,3 +1,4 @@
+#[derive(PartialEq, Debug)]
 struct Card {
     // 4 bits rank
     // 2 bits suit
@@ -44,6 +45,49 @@ impl Card {
     }
     fn new() -> Card {
         Card { value: 0 }
+    }
+    fn parse(token: &str) -> Option<Card> {
+        let mut card = Card::new();
+        let mut chars = token.chars();
+        let mut current = chars.next();
+        match current {
+            Some('|') => {
+                card.set_faceup(false);
+                current = chars.next();
+            }
+            None => return None,
+            _ => {
+                card.set_faceup(true);
+            }
+        }
+        match current {
+            Some('A') => card.set_rank(1),
+            Some('2') => card.set_rank(2),
+            Some('3') => card.set_rank(3),
+            Some('4') => card.set_rank(4),
+            Some('5') => card.set_rank(5),
+            Some('6') => card.set_rank(6),
+            Some('7') => card.set_rank(7),
+            Some('8') => card.set_rank(8),
+            Some('9') => card.set_rank(9),
+            Some('T') => card.set_rank(10),
+            Some('J') => card.set_rank(11),
+            Some('D') => card.set_rank(12),
+            Some('K') => card.set_rank(13),
+            _ => {
+                return None;
+            }
+        }
+        match chars.next() {
+            Some('S') => card.set_suit(0),
+            Some('H') => card.set_suit(1),
+            Some('C') => card.set_suit(2),
+            Some('D') => card.set_suit(3),
+            _ => {
+                return None;
+            }
+        }
+        Some(card)
     }
 }
 
@@ -116,9 +160,23 @@ mod cardtests {
         assert_eq!(card.value, 243);
         assert_eq!(card.suit(), 3);
     }
+
+    #[test]
+    fn parse() {
+        let c = Card::parse("|AH");
+        assert_eq!(c, Some(Card { value: 17 }));
+        assert_eq!(c.unwrap().faceup(), false);
+        let c = Card::parse("AH");
+        assert_eq!(c, Some(Card { value: 81 }));
+        assert_eq!(c.unwrap().faceup(), true);
+        assert!(Card::parse("").is_none());
+        assert!(Card::parse("|").is_none());
+    }
 }
 
 fn main() {
-    let c = Card::new();
-    println!("Card face {}", c.faceup());
+    let c = Card::parse("|AH");
+    println!("Card facedown {}", c.unwrap().faceup());
+    let c = Card::parse("AH");
+    println!("Card faceup {}", c.unwrap().faceup());
 }
