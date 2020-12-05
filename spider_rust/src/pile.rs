@@ -1,7 +1,6 @@
 use crate::card::Card;
-use std::collections::hash_map::DefaultHasher;
+use fasthash::farm;
 use std::collections::HashMap;
-use std::hash::Hasher;
 
 pub struct Pile {
     cards: [u8; 104],
@@ -28,10 +27,10 @@ impl Pile {
         Card::new(self.cards[index])
     }
     fn hash(cards: &[u8; 104], count: usize) -> u64 {
-        let mut hasher = DefaultHasher::new();
-        hasher.write_usize(count);
-        hasher.write(cards);
-        hasher.finish()
+        for i in count..104 {
+            assert!(cards[i] == 0);
+        }
+        farm::hash64(cards)
     }
 
     pub fn parse(s: &str, hashmap: &mut HashMap<u64, Pile>) -> Option<u64> {
@@ -82,6 +81,9 @@ impl Pile {
         // shadow
         let pile = hashmap.get(&pile).expect("valid pile");
         let mut newcards = pile.cards.clone();
+        for i in index..pile.count {
+            newcards[i] = 0;
+        }
         let newcount = index;
         if newcount > 0 {
             let mut card = Card::new(newcards[newcount - 1]);
