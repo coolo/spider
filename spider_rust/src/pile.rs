@@ -77,9 +77,9 @@ impl Pile {
         strings.join(" ")
     }
 
-    pub fn remove_cards(pile: u64, index: usize, hashmap: &mut HashMap<u64, Pile>) -> u64 {
+    pub fn remove_cards(pile: u64, index: usize, pilemap: &mut HashMap<u64, Pile>) -> u64 {
         // shadow
-        let pile = hashmap.get(&pile).expect("valid pile");
+        let pile = pilemap.get(&pile).expect("valid pile");
         let mut newcards = pile.cards.clone();
         for i in index..pile.count {
             newcards[i] = 0;
@@ -90,8 +90,17 @@ impl Pile {
             card.set_faceup(true);
             newcards[newcount - 1] = card.value();
         }
-        Pile::or_insert(&newcards, newcount, hashmap)
+        Pile::or_insert(&newcards, newcount, pilemap)
     }
+
+    pub fn add_card(pile: u64, card: Card, pilemap: &mut HashMap<u64, Pile>) -> u64 {
+        let pile = pilemap.get(&pile).expect("valid pile");
+        let mut newcards = pile.cards.clone();
+        newcards[pile.count] = card.value();
+        let newcount = pile.count + 1;
+        Pile::or_insert(&newcards, newcount, pilemap)
+    }
+
     pub fn is_empty(&self) -> bool {
         self.count == 0
     }

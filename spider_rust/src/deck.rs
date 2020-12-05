@@ -1,6 +1,7 @@
 use crate::pile::Pile;
 use std::collections::HashMap;
 
+#[derive(Debug, Copy, Clone)]
 pub struct Deck {
     play: [u64; 10],
     talon: [u64; 5],
@@ -213,5 +214,49 @@ impl Deck {
             from_card,
             to_card
         );
+    }
+
+    pub fn apply_move(&self, m: &Move, mut pilemap: &mut HashMap<u64, Pile>) -> Deck {
+        let mut newdeck = self.clone();
+
+        if m.talon {
+            let from_pile = m.from as usize;
+            for to in 0..10 {
+                let mut c = pilemap
+                    .get(&self.talon[from_pile])
+                    .expect("valid pile")
+                    .at(to);
+                c.set_faceup(true);
+                newdeck.play[to] = Pile::add_card(self.play[to], c, &mut pilemap);
+            }
+            newdeck.talon[m.from as usize] = Pile::parse("", &mut pilemap).unwrap();
+        }
+        /*
+        else if (m.off)
+        {
+            Card c = newone->piles[m.from]->at(newone->piles[m.from]->cardCount() - 13);
+            newone->piles[15] = newone->piles[15]->newWithCard(c);
+            newone->piles[m.from] = newone->piles[m.from]->remove(m.index);
+        }
+        else
+        {
+            newone->piles[m.to] = newone->piles[m.to]->copyFrom(newone->piles[m.from], m.index);
+            newone->piles[m.from] = newone->piles[m.from]->remove(m.index);
+            if (stop && m.index > 0 && newone->piles[m.from]->at(m.index - 1).unknown)
+            {
+                std::cout << "What's up?" << std::endl;
+                std::string line;
+                std::getline(std::cin, line);
+                Card c(QString::fromStdString(line));
+                newone->piles[m.from] = newone->piles[m.from]->replaceAt(m.index - 1, c);
+                QFile file("tmp");
+                file.open(QIODevice::WriteOnly);
+                file.write(newone->toString().toUtf8());
+                file.close();
+                exit(1);
+            }
+        }
+        */
+        newdeck
     }
 }

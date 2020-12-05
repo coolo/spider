@@ -16,5 +16,7 @@ fn main() {
     let moves = deck.get_moves(&pilemap);
     for m in &moves {
         deck.explain_move(m, &pilemap);
+        let newdeck = deck.apply_move(m, &mut pilemap);
+        println!("{}", newdeck.to_string(&pilemap));
     }
 }
