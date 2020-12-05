@@ -74,6 +74,17 @@ impl Card {
             Some('J') => card.set_rank(11),
             Some('D') => card.set_rank(12),
             Some('K') => card.set_rank(13),
+            Some('X') => {
+                card.set_unknown(true);
+                match chars.next() {
+                    Some('X') => {
+                        return Some(card);
+                    }
+                    _ => {
+                        return None;
+                    }
+                }
+            }
             _ => {
                 return None;
             }
@@ -88,6 +99,41 @@ impl Card {
             }
         }
         Some(card)
+    }
+    pub fn to_string(&self) -> String {
+        let mut result;
+        if self.unknown() {
+            result = String::from("XX");
+        } else {
+            result = match self.rank() {
+                1 => String::from("A"),
+                2 => String::from("2"),
+                3 => String::from("3"),
+                4 => String::from("4"),
+                5 => String::from("5"),
+                6 => String::from("6"),
+                7 => String::from("7"),
+                8 => String::from("8"),
+                9 => String::from("9"),
+                10 => String::from("T"),
+                11 => String::from("J"),
+                12 => String::from("D"),
+                13 => String::from("K"),
+                _ => panic!("broken card"),
+            };
+            result = result
+                + match self.suit() {
+                    0 => "S",
+                    1 => "H",
+                    2 => "C",
+                    3 => "D",
+                    _ => panic!("broken card"),
+                };
+        }
+        if !self.faceup() {
+            result = String::from("|") + &result;
+        }
+        return result;
     }
 }
 
@@ -171,5 +217,13 @@ mod cardtests {
         assert_eq!(c.unwrap().faceup(), true);
         assert!(Card::parse("").is_none());
         assert!(Card::parse("|").is_none());
+    }
+
+    #[test]
+    fn to_string() {
+        let cards = vec!["|AH", "AH", "2S", "|XX", "XX", "TC", "7H", "KS", "|DH"];
+        for card in cards.into_iter() {
+            assert_eq!(Card::parse(card).unwrap().to_string(), card);
+        }
     }
 }
