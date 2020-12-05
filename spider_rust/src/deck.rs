@@ -1,5 +1,7 @@
 use crate::pile::Pile;
+use fasthash::{farm::Hasher64, FastHasher};
 use std::collections::HashMap;
+use std::hash::Hasher;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Deck {
@@ -58,6 +60,18 @@ impl Move {
     }
 }
 impl Deck {
+    pub fn hash(&self) -> u64 {
+        let mut h = Hasher64::new();
+        for i in 0..10 {
+            h.write_u64(self.play[i]);
+        }
+        for i in 0..5 {
+            h.write_u64(self.talon[i])
+        }
+        h.write_u64(self.off);
+        h.finish()
+    }
+
     pub fn parse(contents: &String, pilemap: &mut HashMap<u64, Pile>) -> Deck {
         let mut newdeck = Deck {
             play: [0; 10],
