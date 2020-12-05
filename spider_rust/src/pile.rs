@@ -27,18 +27,16 @@ impl Pile {
     pub fn at(&self, index: usize) -> Card {
         Card::new(self.cards[index])
     }
-    pub fn hash(&self) -> u64 {
+    fn hash(cards: &[u8; 104], count: usize) -> u64 {
         let mut hasher = DefaultHasher::new();
-        hasher.write_usize(self.count);
-        hasher.write(&self.cards);
+        hasher.write_usize(count);
+        hasher.write(cards);
         hasher.finish()
     }
 
     pub fn parse(s: &str, hashmap: &mut HashMap<u64, Pile>) -> Option<u64> {
-        let mut new = Pile {
-            count: 0,
-            cards: [0; 104],
-        };
+        let mut count = 0;
+        let mut cards = [0; 104];
         for card_string in s.split(' ') {
             if card_string.is_empty() {
                 continue;
@@ -49,20 +47,27 @@ impl Pile {
                     return None;
                 }
                 Some(card) => {
-                    new.cards[new.count] = card.value();
-                    new.count += 1;
+                    cards[count] = card.value();
+                    count += 1;
                 }
             }
         }
-        let hash = new.hash();
+        return Some(Pile::or_insert(&cards, count, hashmap));
+    }
+
+    fn or_insert(cards: &[u8; 104], count: usize, hashmap: &mut HashMap<u64, Pile>) -> u64 {
+        let hash = Pile::hash(&cards, count);
         match hashmap.get(&hash) {
             None => {
-                let unmut = new;
-                hashmap.entry(hash).or_insert(unmut);
+                let new = Pile {
+                    cards: *cards,
+                    count: count,
+                };
+                hashmap.entry(hash).or_insert(new);
             }
             _ => (),
         }
-        return Some(hash);
+        hash
     }
 
     pub fn to_string(&self) -> String {
@@ -72,6 +77,19 @@ impl Pile {
         }
         strings.join(" ")
     }
+
+    pub fn remove_cards(pile: u64, index: usize, hashmap: &mut HashMap<u64, Pile>) -> u64 {
+        // shadow
+        let pile = hashmap.get(&pile).expect("valid pile");
+        let mut newcards = pile.cards.clone();
+        let newcount = index;
+        if newcount > 0 {
+            let mut card = Card::new(newcards[newcount - 1]);
+            card.set_faceup(true);
+            newcards[newcount - 1] = card.value();
+        }
+        Pile::or_insert(&newcards, newcount, hashmap)
+    }
 }
 
 #[cfg(test)]
@@ -80,11 +98,29 @@ mod piletests {
 
     #[test]
     fn parse() {
+        let mut hashmap = HashMap::new();
+        let pile1 = Pile::parse("|AS |3S |AS |6S |3H 8S", &mut hashmap).expect("parsed");
         assert_eq!(
-            Pile::parse("|AS |3S |AS |6S |3H 8S")
-                .expect("parsed")
-                .to_string(),
+            hashmap.get(&pile1).expect("valid pile").to_string(),
             "|AS |3S |AS |6S |3H 8S"
         );
+    }
+
+    #[test]
+    fn remove_cards() {
+        let mut hashmap = HashMap::new();
+        let pile1 = Pile::parse("|AS |3S |AS |6S |3H 8S", &mut hashmap).expect("parsed");
+        let pile2 = Pile::remove_cards(pile1, 5, &mut hashmap);
+        assert_eq!(
+            hashmap.get(&pile2).expect("valid pile").to_string(),
+            "|AS |3S |AS |6S 3H"
+        );
+        let pile3 = Pile::remove_cards(pile2, 4, &mut hashmap);
+        assert_eq!(
+            hashmap.get(&pile3).expect("valid pile").to_string(),
+            "|AS |3S |AS 6S"
+        );
+        // we can repeat the operation with the same result
+        assert_eq!(Pile::remove_cards(pile1, 5, &mut hashmap), pile2);
     }
 }

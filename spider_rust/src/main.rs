@@ -26,11 +26,12 @@ fn main() {
             }
             Some(pile) => {
                 let parsed = pile::Pile::parse(pile, &mut pilemap);
-                println!("Pile {} {}", prefix, parsed.expect("Parsed"));
+                println!(
+                    "Pile {} {}",
+                    prefix,
+                    pilemap[&parsed.expect("Parsed")].to_string()
+                );
             }
         }
-    }
-    for pile in pilemap.values() {
-        println!("Pile {}", pile.to_string());
     }
 }

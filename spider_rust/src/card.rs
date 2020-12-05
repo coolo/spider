@@ -14,7 +14,7 @@ impl Card {
     pub fn faceup(&self) -> bool {
         self.value & (1 << 6) > 0
     }
-    fn set_faceup(&mut self, face: bool) {
+    pub fn set_faceup(&mut self, face: bool) {
         if face {
             self.value = self.value | (1 << 6)
         } else {
