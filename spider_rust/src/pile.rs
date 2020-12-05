@@ -1,15 +1,40 @@
 use crate::card::Card;
+use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
+use std::hash::Hasher;
 
 pub struct Pile {
     cards: [u8; 104],
     count: usize,
 }
 
+impl PartialEq for Pile {
+    fn eq(&self, other: &Self) -> bool {
+        if self.count != other.count {
+            return false;
+        };
+        for i in 0..self.count {
+            if self.cards[i] != other.cards[i] {
+                return false;
+            }
+        }
+        true
+    }
+}
+impl Eq for Pile {}
+
 impl Pile {
     pub fn at(&self, index: usize) -> Card {
         Card::new(self.cards[index])
     }
-    pub fn parse(s: &str) -> Option<Pile> {
+    pub fn hash(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        hasher.write_usize(self.count);
+        hasher.write(&self.cards);
+        hasher.finish()
+    }
+
+    pub fn parse(s: &str, hashmap: &mut HashMap<u64, Pile>) -> Option<u64> {
         let mut new = Pile {
             count: 0,
             cards: [0; 104],
@@ -29,8 +54,15 @@ impl Pile {
                 }
             }
         }
-        println!("Pile {}", new.to_string());
-        return Some(new);
+        let hash = new.hash();
+        match hashmap.get(&hash) {
+            None => {
+                let unmut = new;
+                hashmap.entry(hash).or_insert(unmut);
+            }
+            _ => (),
+        }
+        return Some(hash);
     }
 
     pub fn to_string(&self) -> String {
