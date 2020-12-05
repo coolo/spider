@@ -1,6 +1,6 @@
-//mod card;
-//use card::Card;
 use std::fs;
+mod card;
+mod pile;
 
 fn main() {
     let filename = std::env::args().nth(1).expect("no filename given");
@@ -21,7 +21,11 @@ fn main() {
             None => {
                 break;
             }
-            Some(pile) => println!("Pile {} {}", prefix, pile),
+            Some(pile) => {
+                println!("Pile {} {}", prefix, pile);
+                let parsed = pile::Pile::parse(pile);
+                assert!(parsed.is_some());
+            }
         }
     }
 }

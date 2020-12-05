@@ -8,6 +8,9 @@ pub struct Card {
 }
 
 impl Card {
+    pub fn value(&self) -> u8 {
+        self.value
+    }
     pub fn faceup(&self) -> bool {
         self.value & (1 << 6) > 0
     }
@@ -72,7 +75,7 @@ impl Card {
             Some('9') => card.set_rank(9),
             Some('T') => card.set_rank(10),
             Some('J') => card.set_rank(11),
-            Some('D') => card.set_rank(12),
+            Some('Q') => card.set_rank(12),
             Some('K') => card.set_rank(13),
             Some('X') => {
                 card.set_unknown(true);
@@ -98,6 +101,9 @@ impl Card {
                 return None;
             }
         }
+        if chars.count() > 0 {
+            return None;
+        }
         Some(card)
     }
     pub fn to_string(&self) -> String {
@@ -117,7 +123,7 @@ impl Card {
                 9 => String::from("9"),
                 10 => String::from("T"),
                 11 => String::from("J"),
-                12 => String::from("D"),
+                12 => String::from("Q"),
                 13 => String::from("K"),
                 _ => panic!("broken card"),
             };
@@ -217,11 +223,12 @@ mod cardtests {
         assert_eq!(c.unwrap().faceup(), true);
         assert!(Card::parse("").is_none());
         assert!(Card::parse("|").is_none());
+        assert!(Card::parse("AHx").is_none());
     }
 
     #[test]
     fn to_string() {
-        let cards = vec!["|AH", "AH", "2S", "|XX", "XX", "TC", "7H", "KS", "|DH"];
+        let cards = vec!["|AH", "AH", "2S", "|XX", "XX", "TC", "7H", "KS", "|QH"];
         for card in cards.into_iter() {
             assert_eq!(Card::parse(card).unwrap().to_string(), card);
         }
