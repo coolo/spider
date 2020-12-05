@@ -16,13 +16,13 @@ pub struct Move {
 }
 
 impl Move {
-    pub fn new() -> Move {
+    pub fn regular(from: usize, to: usize, index: usize) -> Move {
         Move {
             talon: false,
             off: false,
-            from: -1,
-            to: -1,
-            index: 0,
+            from: from as i8,
+            to: to as i8,
+            index: index as u8,
         }
     }
     pub fn from_talon(from: i8) -> Move {
@@ -32,6 +32,15 @@ impl Move {
             from: from,
             to: -1,
             index: 0,
+        }
+    }
+    pub fn off(from: i8, index: u8) -> Move {
+        Move {
+            talon: false,
+            off: true,
+            from: from,
+            to: 0,
+            index: index,
         }
     }
 }
@@ -97,70 +106,75 @@ impl Deck {
                 break;
             }
         }
-        let one_is_empty = false;
-        for _from in 0..10 {
-            /*
-            if (piles[from]->empty())
-            {
+        // an optimization - only move to first empty
+        let mut one_is_empty = false;
+
+        // translate ID into reference for quicker access
+        let mut play_refs = Vec::new();
+        for i in 0..10 {
+            play_refs.push(&pilemap[&self.play[i]]);
+        }
+
+        for from in 0..10 {
+            if play_refs[from].is_empty() {
                 one_is_empty = true;
                 continue;
             }
+            let from_pile = play_refs[from];
+            let mut index = from_pile.count() - 1;
+            let top_card = from_pile.at(index);
 
-            int index = piles[from]->cardCount() - 1;
-            Suit top_suit = piles[from]->at(index).suit;
-            int top_rank = int(piles[from]->at(index).rank) - 1;
+            let top_suit = top_card.suit();
+            let mut top_rank = top_card.rank() - 1;
 
-            while (index >= 0)
-            {
-                Card current = piles[from]->at(index);
-                if (!current.faceup)
+            while index >= 0 {
+                let current = from_pile.at(index);
+                if !current.faceup() {
                     break;
-                if (current.suit != top_suit)
-                    break;
-                if (top_rank + 1 != current.rank)
-                    break;
-                top_rank = piles[from]->at(index).rank;
-
-                if (piles[from]->cardCount() - index == 13)
-                {
-                    ret.clear();
-                    ret.append(Move());
-                    ret.last().from = from;
-                    ret.last().to = 0;
-                    ret.last().off = true;
-                    ret.last().index = index;
-                    return ret;
                 }
-                bool moved_to_empty = false;
-                for (int to = 0; to < 10; to++)
-                {
-                    if (to == from)
+                if current.suit() != top_suit {
+                    break;
+                }
+                if top_rank + 1 != current.rank() {
+                    break;
+                }
+                top_rank = current.rank();
+
+                if from_pile.count() - index == 13 {
+                    // off move
+                    vec.clear();
+                    let from = from as i8;
+                    let index = index as u8;
+                    vec.push(Move::off(from, index));
+                    return vec;
+                }
+
+                let mut moved_to_empty = false;
+
+                for to in 0..10 {
+                    if to == from {
                         continue;
-                    //qDebug() << "trying to move " << (piles[from]->cardCount() - index) << " from " << from << " to " << to;
-                    int to_count = piles[to]->cardCount();
-                    if (to_count > 0)
-                    {
-                        Card top_card = piles[to]->at(to_count - 1);
-                        if (top_card.rank != top_rank + 1)
-                            continue;
                     }
-                    else if (moved_to_empty)
-                    {
-                        if (talons_done)
+                    let to_pile = play_refs[to];
+                    let to_count = to_pile.count();
+
+                    if to_count > 0 {
+                        let top_card = to_pile.at(to_count - 1);
+                        if top_card.rank() != top_rank + 1 {
                             continue;
-                    }
-                    else
-                    {
+                        }
+                    } else if moved_to_empty {
+                        if next_talon.is_none() {
+                            continue;
+                        };
+                    } else {
                         moved_to_empty = true;
                     }
-
-                    ret.append(Move());
-                    ret.last().from = from;
-                    ret.last().to = to;
-                    ret.last().index = index;
+                    vec.push(Move::regular(from, to, index));
                 }
-                index--;
-            } */
+
+                index -= 1;
+            }
         }
         if !one_is_empty && next_talon.is_some() {
             vec.push(Move::from_talon(next_talon.unwrap()));
@@ -182,7 +196,7 @@ impl Deck {
         let from_pile = &pilemap[&self.play[from_pile]];
         let to_pile = m.to as usize;
         let to_pile = &pilemap[&self.play[to_pile]];
-        let from_card = m.from as usize;
+        let from_card = m.index as usize;
         let from_card = from_pile.at(from_card).to_string();
         let mut to_card = String::from("Empty");
         if to_pile.count() > 0 {
