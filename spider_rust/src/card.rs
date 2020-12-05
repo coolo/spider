@@ -46,11 +46,11 @@ impl Card {
         self.value = (self.value & !3) + suit;
         self.value = (self.value << 4) + _rank;
     }
-    pub fn new() -> Card {
-        Card { value: 0 }
+    pub fn new(value: u8) -> Card {
+        Card { value: value }
     }
     pub fn parse(token: &str) -> Option<Card> {
-        let mut card = Card::new();
+        let mut card = Card::new(0);
         let mut chars = token.chars();
         let mut current = chars.next();
         match current {
