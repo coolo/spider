@@ -11,8 +11,8 @@ pub struct Deck {
 pub struct Move {
     off: bool,
     talon: bool,
-    from: i8,
-    to: i8,
+    from: u8,
+    to: u8,
     index: u8,
 }
 
@@ -21,28 +21,40 @@ impl Move {
         Move {
             talon: false,
             off: false,
-            from: from as i8,
-            to: to as i8,
+            from: from as u8,
+            to: to as u8,
             index: index as u8,
         }
     }
-    pub fn from_talon(from: i8) -> Move {
+    pub fn from_talon(from: usize) -> Move {
         Move {
             talon: true,
             off: false,
-            from: from,
-            to: -1,
+            from: from as u8,
+            to: 0,
             index: 0,
         }
     }
-    pub fn off(from: i8, index: u8) -> Move {
+    pub fn off(from: usize, index: usize) -> Move {
         Move {
             talon: false,
             off: true,
-            from: from,
+            from: from as u8,
             to: 0,
-            index: index,
+            index: index as u8,
         }
+    }
+
+    pub fn from(&self) -> usize {
+        self.from as usize
+    }
+
+    pub fn to(&self) -> usize {
+        self.to as usize
+    }
+
+    pub fn index(&self) -> usize {
+        self.index as usize
     }
 }
 impl Deck {
@@ -98,12 +110,11 @@ impl Deck {
     pub fn get_moves(&self, pilemap: &HashMap<u64, Pile>) -> Vec<Move> {
         let mut vec = Vec::new();
 
-        let mut next_talon: Option<i8> = None;
+        let mut next_talon: Option<usize> = None;
         for i in 0..5 {
             let talon = &pilemap[&self.talon[i]];
             if !talon.is_empty() {
-                let index = i as i8;
-                next_talon = Some(index);
+                next_talon = Some(i);
                 break;
             }
         }
@@ -144,8 +155,6 @@ impl Deck {
                 if from_pile.count() - index == 13 {
                     // off move
                     vec.clear();
-                    let from = from as i8;
-                    let index = index as u8;
                     vec.push(Move::off(from, index));
                     return vec;
                 }
@@ -193,19 +202,18 @@ impl Deck {
             return;
         }
         // happy casting to avoid storing every index as 64 bits
-        let from_pile = m.from as usize;
-        let from_pile = &pilemap[&self.play[from_pile]];
-        let to_pile = m.to as usize;
+        let from_pile = &pilemap[&self.play[m.from()]];
+        let to_pile = m.to();
         let to_pile = &pilemap[&self.play[to_pile]];
-        let from_card = m.index as usize;
+        let from_card = m.index();
         let from_card = from_pile.at(from_card).to_string();
         let mut to_card = String::from("Empty");
         if to_pile.count() > 0 {
             let c = to_pile.at(to_pile.count() - 1);
             to_card = c.to_string();
         }
-        let mut count = from_pile.count() as u8;
-        count -= m.index;
+        let mut count = from_pile.count();
+        count -= m.index();
         println!(
             "Move {} cards from {} to {} - {}->{}",
             count,
@@ -220,7 +228,7 @@ impl Deck {
         let mut newdeck = self.clone();
 
         if m.talon {
-            let from_pile = m.from as usize;
+            let from_pile = m.from();
             for to in 0..10 {
                 let mut c = pilemap
                     .get(&self.talon[from_pile])
@@ -229,27 +237,26 @@ impl Deck {
                 c.set_faceup(true);
                 newdeck.play[to] = Pile::add_card(self.play[to], c, &mut pilemap);
             }
-            newdeck.talon[m.from as usize] = Pile::parse("", &mut pilemap).unwrap();
+            newdeck.talon[m.from()] = Pile::parse("", &mut pilemap).unwrap();
             return newdeck;
         }
 
         if m.off {
-            let from_index = m.from as usize;
+            let from_index = m.from();
             let from_pile = pilemap.get(&self.play[from_index]).expect("valid pile");
             let c = from_pile.at(from_pile.count() - 13);
             newdeck.off = Pile::add_card(self.off, c, &mut pilemap);
-            newdeck.play[m.from as usize] =
-                Pile::remove_cards(self.play[m.from as usize], m.index as usize, &mut pilemap);
+            newdeck.play[m.from()] =
+                Pile::remove_cards(self.play[m.from()], m.index(), &mut pilemap);
             return newdeck;
         }
-        newdeck.play[m.to as usize] = Pile::copy_from(
-            self.play[m.to as usize],
-            self.play[m.from as usize],
-            m.index as usize,
+        newdeck.play[m.to()] = Pile::copy_from(
+            self.play[m.to()],
+            self.play[m.from()],
+            m.index(),
             &mut pilemap,
         );
-        newdeck.play[m.from as usize] =
-            Pile::remove_cards(self.play[m.from as usize], m.index as usize, &mut pilemap);
+        newdeck.play[m.from()] = Pile::remove_cards(self.play[m.from()], m.index(), &mut pilemap);
         newdeck
     }
 }
