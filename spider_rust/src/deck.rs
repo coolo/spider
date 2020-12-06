@@ -1,6 +1,7 @@
 use crate::pile::Pile;
 use fasthash::{farm::Hasher64, FastHasher};
 use std::collections::HashMap;
+use std::fmt;
 use std::hash::Hasher;
 
 #[derive(Debug, Copy, Clone)]
@@ -10,12 +11,23 @@ pub struct Deck {
     off: u64,
 }
 
+#[derive(Debug, Copy, Clone)]
 pub struct Move {
     off: bool,
     talon: bool,
     from: u8,
     to: u8,
     index: u8,
+}
+
+impl fmt::Display for Move {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "(index: {}, from: {}, to: {})",
+            self.index, self.from, self.to
+        )
+    }
 }
 
 impl Move {
@@ -117,12 +129,12 @@ impl Deck {
     pub fn to_string(&self, pilemap: &HashMap<u64, Pile>) -> String {
         let mut result = String::new();
         for i in 0..10 {
-            result += &format!("Play{} {}\n", i, pilemap[&self.play[i]].to_string());
+            result += &format!("Play{}: {}\n", i, pilemap[&self.play[i]].to_string());
         }
         for i in 0..5 {
-            result += &format!("Deck{} {}\n", i, pilemap[&self.talon[i]].to_string());
+            result += &format!("Deck{}: {}\n", i, pilemap[&self.talon[i]].to_string());
         }
-        result += &format!("Off {}", pilemap[&self.off].to_string());
+        result += &format!("Off: {}", pilemap[&self.off].to_string());
         result
     }
 
@@ -158,7 +170,7 @@ impl Deck {
             let top_suit = top_card.suit();
             let mut top_rank = top_card.rank() - 1;
 
-            while index > 0 {
+            loop {
                 let current = from_pile.at(index);
                 if !current.faceup() {
                     break;
@@ -175,13 +187,15 @@ impl Deck {
                     // off move
                     vec.clear();
                     vec.push(Move::off(from, index));
+                    //println!("Found off move");
                     return vec;
                 }
 
                 if index > 1 {
                     let next_card = from_pile.at(index - 1);
                     if next_card.suit() == top_suit && next_card.rank() == top_rank + 1 {
-                        //println!("Skip");
+                        //println!("Skip {} {}", current.to_string(), next_card.to_string());
+                        index -= 1;
                         continue;
                     }
                 }
@@ -200,22 +214,57 @@ impl Deck {
                             continue;
                         }
                     } else if moved_to_empty {
+                        // if there is a talon left to draw the empty cell
+                        // we move to does matter. In the endgame not at all
                         if next_talon.is_none() {
                             continue;
-                        };
+                        }
                     } else {
                         moved_to_empty = true;
                     }
                     vec.push(Move::regular(from, to, index));
                 }
 
+                if index == 0 {
+                    break;
+                };
                 index -= 1;
             }
         }
-        if !one_is_empty && next_talon.is_some() {
-            vec.push(Move::from_talon(next_talon.unwrap()));
+        match self.prune_moves(&mut vec, &play_refs) {
+            None => {
+                if !one_is_empty && next_talon.is_some() {
+                    vec.push(Move::from_talon(next_talon.unwrap()));
+                }
+                vec
+            }
+            Some(m) => {
+                //println!("Pruning");
+                vec.retain(|&x| {
+                    x.from == m.from && x.to == m.to && !x.off && x.index == m.index && !x.talon
+                });
+                vec
+            }
         }
-        vec
+    }
+
+    fn prune_moves(&self, moves: &Vec<Move>, play_refs: &Vec<&Pile>) -> Option<Move> {
+        for m in moves {
+            if m.off || m.talon {
+                continue;
+            }
+            let to_pile = play_refs[m.to()];
+            if to_pile.count() == 0 {
+                continue;
+            }
+            let from_suit = play_refs[m.from()].at(m.index()).suit();
+            let to_suit = to_pile.at(to_pile.count() - 1).suit();
+            if to_suit == from_suit {
+                let newm: Move = *m;
+                return Some(newm.clone());
+            }
+        }
+        None
     }
 
     pub fn explain_move(&self, m: &Move, pilemap: &HashMap<u64, Pile>) -> () {
@@ -229,10 +278,8 @@ impl Deck {
         }
         // happy casting to avoid storing every index as 64 bits
         let from_pile = &pilemap[&self.play[m.from()]];
-        let to_pile = m.to();
-        let to_pile = &pilemap[&self.play[to_pile]];
-        let from_card = m.index();
-        let from_card = from_pile.at(from_card).to_string();
+        let to_pile = &pilemap[&self.play[m.to()]];
+        let from_card = from_pile.at(m.index()).to_string();
         let mut to_card = String::from("Empty");
         if to_pile.count() > 0 {
             let c = to_pile.at(to_pile.count() - 1);
@@ -284,5 +331,94 @@ impl Deck {
         );
         newdeck.play[m.from()] = Pile::remove_cards(self.play[m.from()], m.index(), &mut pilemap);
         newdeck
+    }
+}
+
+#[cfg(test)]
+mod decktests {
+    use super::*;
+
+    #[test]
+    fn parse() {
+        let text = "Play0: KS QS JS TS 9S 8S 7S AS
+Play1: |AH |4H QH JH TH 9H 8H 7H 6H 5H
+Play2: |TH |2S |JS |KS |KS QH JH 2H AH
+Play3: |6H 3H
+Play4: |TH |3S |TS 9S 8S KH QH JH TS 9H 8H 7H 6H 5S 4S 3S 2S AS
+Play5: |9S |9H 8H 7H
+Play6: |7S |QS |KH |4H 3H 2H
+Play7: |8S |JS |7S 6S 5H 4H 2S AS KH QS 6S 5S 4S 3S
+Play8: 6S 5S 4S 3H 2H AH
+Play9: 5H
+Deck0: 
+Deck1: 
+Deck2: 
+Deck3: 
+Deck4: 
+Off: KS KH";
+        let mut hashmap = HashMap::new();
+        let deck = Deck::parse(&text.to_string(), &mut hashmap);
+        assert_eq!(deck.to_string(&hashmap), text);
+    }
+
+    #[test]
+    fn taketwo() {
+        let text = "Play0: KS QS JS TS 9S 8S 7S AS
+Play1: |AH |4H QH JH TH 9H 8H 7H 6H 5H
+Play2: |TH |2S |JS |KS |KS QH JH 2H AH
+Play3: |6H 3H
+Play4: |TH |3S |TS 9S 8S KH QH JH TS 9H 8H 7H 6H 5S 4S 3S 2S AS
+Play5: |9S |9H 8H 7H
+Play6: |7S |QS |KH |4H 3H 2H
+Play7: |8S |JS |7S 6S 5H 4H 2S AS KH QS 6S 5S 4S 3S
+Play8: 6S 5S 4S 3H 2H AH
+Play9: 5H
+Deck0: 
+Deck1: 
+Deck2: 
+Deck3: 
+Deck4: 
+Off: KS KH";
+        let mut hashmap = HashMap::new();
+        let deck = Deck::parse(&text.to_string(), &mut hashmap);
+        let moves = deck.get_moves(&hashmap);
+        // pick 2H+AH to move to 3H
+        assert_eq!(moves.len(), 1);
+        let m = moves[0];
+        assert_eq!(m.from, 2);
+        assert_eq!(m.to, 3);
+        assert_eq!(m.index, 7);
+    }
+
+    #[test]
+    fn pickone() {
+        let text = "Play0: KS QS JS TS 9S 8S 7S AS
+Play1: |AH |4H QH JH TH 9H 8H 7H 6H 5H
+Play2: |TH |2S |JS |KS |KS QH JH 2H AH
+Play3: |3H 6H
+Play4: |TH |3S |TS 9S 8S KH QH JH TS 9H 8H 7H 6H 5S 4S 3S 2S AS
+Play5: |7H |9H 8H 9S
+Play6: |7S |QS |KH |4H 3H 2H
+Play7: |8S |JS |7S 6S 5H 4H 2S AS KH QS 6S 5S 4S 3S
+Play8: 6S 5S 4S 3H 2H AH
+Play9: 5H
+Deck0: 
+Deck1: 
+Deck2: 
+Deck3: 
+Deck4: 
+Off: KS KH";
+        let mut hashmap = HashMap::new();
+        let deck = Deck::parse(&text.to_string(), &mut hashmap);
+        let moves = deck.get_moves(&hashmap);
+        for m in &moves {
+            deck.explain_move(m, &hashmap);
+        }
+        // pick 5H to move to 6H
+        assert_eq!(moves.len(), 1);
+        let m = moves[0];
+        assert_eq!(m.from, 9);
+        assert_eq!(m.to, 3);
+        assert_eq!(m.index, 0);
     }
 }

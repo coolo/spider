@@ -24,7 +24,8 @@ fn main() {
         match unvisted.pop_front() {
             None => break,
             Some(deck) => {
-                if (visited.len() % 1000 == 0) {
+                let output = visited.len() % 10000 == 0;
+                if output {
                     println!("{}", deck.to_string(&pilemap));
 
                     println!(
@@ -36,7 +37,9 @@ fn main() {
                 }
                 let moves = deck.get_moves(&pilemap);
                 for m in &moves {
-                    //deck.explain_move(m, &pilemap);
+                    if output {
+                        deck.explain_move(m, &pilemap);
+                    }
                     let newdeck = deck.apply_move(m, &mut pilemap);
                     let hash = newdeck.hash();
                     if !visited.contains(&hash) {
