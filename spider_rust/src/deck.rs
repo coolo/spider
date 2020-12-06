@@ -1,7 +1,7 @@
+use crate::moves::Move;
 use crate::pile::Pile;
 use fasthash::{farm::Hasher64, FastHasher};
 use std::collections::HashMap;
-use std::fmt;
 use std::hash::Hasher;
 
 #[derive(Debug, Copy, Clone)]
@@ -11,66 +11,6 @@ pub struct Deck {
     off: u64,
 }
 
-#[derive(Debug, Copy, Clone)]
-pub struct Move {
-    off: bool,
-    talon: bool,
-    from: u8,
-    to: u8,
-    index: u8,
-}
-
-impl fmt::Display for Move {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "(index: {}, from: {}, to: {})",
-            self.index, self.from, self.to
-        )
-    }
-}
-
-impl Move {
-    pub fn regular(from: usize, to: usize, index: usize) -> Move {
-        Move {
-            talon: false,
-            off: false,
-            from: from as u8,
-            to: to as u8,
-            index: index as u8,
-        }
-    }
-    pub fn from_talon(from: usize) -> Move {
-        Move {
-            talon: true,
-            off: false,
-            from: from as u8,
-            to: 0,
-            index: 0,
-        }
-    }
-    pub fn off(from: usize, index: usize) -> Move {
-        Move {
-            talon: false,
-            off: true,
-            from: from as u8,
-            to: 0,
-            index: index as u8,
-        }
-    }
-
-    pub fn from(&self) -> usize {
-        self.from as usize
-    }
-
-    pub fn to(&self) -> usize {
-        self.to as usize
-    }
-
-    pub fn index(&self) -> usize {
-        self.index as usize
-    }
-}
 impl Deck {
     pub fn hash(&self) -> u64 {
         let mut h = Hasher64::new();
@@ -138,7 +78,7 @@ impl Deck {
         result
     }
 
-    pub fn get_moves(&self, pilemap: &HashMap<u64, Pile>) -> Vec<Move> {
+    pub fn get_moves(&self, pilemap: &HashMap<u64, Pile>, prune: bool) -> Vec<Move> {
         let mut vec = Vec::new();
 
         let mut next_talon: Option<usize> = None;
@@ -239,9 +179,16 @@ impl Deck {
                 vec
             }
             Some(m) => {
-                //println!("Pruning");
+                if !prune {
+                    return vec;
+                }
                 vec.retain(|&x| {
-                    x.from == m.from && x.to == m.to && !x.off && x.index == m.index && !x.talon
+                    // TODO use Eq
+                    x.from() == m.from()
+                        && x.to() == m.to()
+                        && !x.is_off()
+                        && x.index() == m.index()
+                        && !x.is_talon()
                 });
                 vec
             }
@@ -250,7 +197,7 @@ impl Deck {
 
     fn prune_moves(&self, moves: &Vec<Move>, play_refs: &Vec<&Pile>) -> Option<Move> {
         for m in moves {
-            if m.off || m.talon {
+            if m.is_off() || m.is_talon() {
                 continue;
             }
             let to_pile = play_refs[m.to()];
@@ -268,12 +215,12 @@ impl Deck {
     }
 
     pub fn explain_move(&self, m: &Move, pilemap: &HashMap<u64, Pile>) -> () {
-        if m.talon {
+        if m.is_talon() {
             println!("Draw another talon");
             return;
         }
-        if m.off {
-            println!("Move a sequence from {} to the off", m.from + 1);
+        if m.is_off() {
+            println!("Move a sequence from {} to the off", m.from() + 1);
             return;
         }
         // happy casting to avoid storing every index as 64 bits
@@ -290,8 +237,8 @@ impl Deck {
         println!(
             "Move {} cards from {} to {} - {}->{}",
             count,
-            m.from + 1,
-            m.to + 1,
+            m.from() + 1,
+            m.to() + 1,
             from_card,
             to_card
         );
@@ -313,7 +260,7 @@ impl Deck {
     pub fn apply_move(&self, m: &Move, mut pilemap: &mut HashMap<u64, Pile>) -> Deck {
         let mut newdeck = self.clone();
 
-        if m.talon {
+        if m.is_talon() {
             let from_pile = m.from();
             for to in 0..10 {
                 let mut c = pilemap
@@ -327,7 +274,7 @@ impl Deck {
             return newdeck;
         }
 
-        if m.off {
+        if m.is_off() {
             let from_index = m.from();
             let from_pile = pilemap.get(&self.play[from_index]).expect("valid pile");
             let c = from_pile.at(from_pile.count() - 13);

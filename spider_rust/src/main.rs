@@ -1,12 +1,49 @@
 use std::fs;
 mod card;
 mod deck;
+mod moves;
 mod pile;
 use deck::Deck;
+use moves::Move;
 use pile::Pile;
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::collections::HashMap;
-use std::collections::VecDeque;
+
+fn visit(
+    deck: Deck,
+    pilemap: &mut HashMap<u64, Pile>,
+    visited: &mut BTreeMap<u64, u32>,
+    orig_min_chaos: u32,
+    level: u32,
+) -> u32 {
+    if level == 10 {
+        return orig_min_chaos;
+    }
+    let mut min_chaos = orig_min_chaos;
+    let hash = deck.hash();
+    if let Some(chaos) = visited.get(&hash) {
+        if *chaos < min_chaos {
+            return *chaos;
+        }
+        return min_chaos;
+    }
+
+    let chaos = deck.chaos(&pilemap);
+    if chaos < min_chaos {
+        min_chaos = chaos;
+    }
+    //println!("Visit at level {} {}/{}", level, chaos, min_chaos);
+    visited.insert(hash, chaos);
+    let moves = deck.get_moves(&pilemap, true);
+    for m in &moves {
+        let newdeck = deck.apply_move(m, pilemap);
+        if newdeck.is_won(&pilemap) {
+            return 0;
+        }
+        min_chaos = visit(newdeck, pilemap, visited, min_chaos, level + 1);
+    }
+    min_chaos
+}
 
 fn main() {
     let filename = std::env::args().nth(1).expect("no filename given");
@@ -15,43 +52,24 @@ fn main() {
     let mut pilemap: HashMap<u64, Pile> = HashMap::new();
     let deck = Deck::parse(&contents, &mut pilemap);
 
-    let mut unvisted: VecDeque<Deck> = VecDeque::new();
-    unvisted.push_back(deck);
-    let mut visited = BTreeSet::new();
-    visited.insert(deck.hash());
-
+    const MAX_CHAOS: u32 = 80000;
     loop {
-        match unvisted.pop_front() {
-            None => break,
-            Some(deck) => {
-                let output = visited.len() % 10000 == 0;
-                if output {
-                    println!("{}", deck.to_string(&pilemap));
+        let moves = deck.get_moves(&pilemap, false);
+        let mut bestchaos = MAX_CHAOS;
+        // invalid move
+        let mut bestmove = Move::off(11, 0);
+        for m in &moves {
+            let mut visited = BTreeMap::new();
+            deck.explain_move(m, &pilemap);
+            let newdeck = deck.apply_move(m, &mut pilemap);
 
-                    println!(
-                        "Visited: {} unvisited: {} piles: {}",
-                        visited.len(),
-                        unvisted.len(),
-                        pilemap.len()
-                    );
-                }
-                let moves = deck.get_moves(&pilemap);
-                for m in &moves {
-                    if output {
-                        deck.explain_move(m, &pilemap);
-                    }
-                    let newdeck = deck.apply_move(m, &mut pilemap);
-                    let hash = newdeck.hash();
-                    if !visited.contains(&hash) {
-                        visited.insert(hash);
-                        if newdeck.is_won(&pilemap) {
-                            println!("WON!");
-                            break;
-                        }
-                        unvisted.push_back(newdeck);
-                    }
-                }
+            let newchaos = visit(newdeck, &mut pilemap, &mut visited, MAX_CHAOS, 0);
+            println!("Visited in total: {} -> {}", visited.len(), newchaos);
+            if newchaos < bestchaos {
+                bestchaos = newchaos;
+                bestmove = *m;
             }
         }
+        break;
     }
 }
