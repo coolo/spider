@@ -297,6 +297,19 @@ impl Deck {
         );
     }
 
+    pub fn chaos(&self, pilemap: &HashMap<u64, Pile>) -> u32 {
+        let mut result = 0;
+        for i in 0..10 {
+            result += pilemap[&self.play[i]].chaos();
+        }
+        for i in 0..5 {
+            if !pilemap[&self.talon[i]].is_empty() {
+                result += 1000;
+            }
+        }
+        result
+    }
+
     pub fn apply_move(&self, m: &Move, mut pilemap: &mut HashMap<u64, Pile>) -> Deck {
         let mut newdeck = self.clone();
 
@@ -340,14 +353,14 @@ mod decktests {
 
     #[test]
     fn parse() {
-        let text = "Play0: KS QS JS TS 9S 8S 7S AS
+        let text = "Play0: KS QS JS TS 9S 8S 7S 6S
 Play1: |AH |4H QH JH TH 9H 8H 7H 6H 5H
 Play2: |TH |2S |JS |KS |KS QH JH 2H AH
 Play3: |6H 3H
 Play4: |TH |3S |TS 9S 8S KH QH JH TS 9H 8H 7H 6H 5S 4S 3S 2S AS
 Play5: |9S |9H 8H 7H
 Play6: |7S |QS |KH |4H 3H 2H
-Play7: |8S |JS |7S 6S 5H 4H 2S AS KH QS 6S 5S 4S 3S
+Play7: |8S |JS |7S AS 5H 4H 2S AS KH QS 6S 5S 4S 3S
 Play8: 6S 5S 4S 3H 2H AH
 Play9: 5H
 Deck0: 
@@ -420,5 +433,51 @@ Off: KS KH";
         assert_eq!(m.from, 9);
         assert_eq!(m.to, 3);
         assert_eq!(m.index, 0);
+    }
+
+    #[test]
+    fn chaos0() {
+        let text = "Play0: 
+Play1: 
+Play2: 
+Play3: 
+Play4: 
+Play5: 
+Play6: 
+Play7: 
+Play8: 
+Play9: 
+Deck0: 
+Deck1: 
+Deck2: 
+Deck3: 
+Deck4: 
+Off: KS KS KS KS KH KH KH KH";
+        let mut hashmap = HashMap::new();
+        let deck = Deck::parse(&text.to_string(), &mut hashmap);
+        assert_eq!(deck.chaos(&hashmap), 0);
+    }
+
+    #[test]
+    fn chaos2() {
+        let text = "Play0: KH QH JH TH 
+Play1: 9H 
+Play2: 8H 7H 6H 5H 4H 3H 2H AH
+Play3: 
+Play4: 
+Play5: 
+Play6: 
+Play7: 
+Play8: 
+Play9: 
+Deck0: 
+Deck1: 
+Deck2: 
+Deck3: 
+Deck4: 
+Off: KS KS KS KS KH KH KH";
+        let mut hashmap = HashMap::new();
+        let deck = Deck::parse(&text.to_string(), &mut hashmap);
+        assert_eq!(deck.chaos(&hashmap), 16);
     }
 }

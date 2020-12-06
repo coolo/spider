@@ -5,6 +5,7 @@ use std::collections::HashMap;
 pub struct Pile {
     cards: [u8; 104],
     count: usize,
+    chaos: u32,
 }
 
 impl PartialEq for Pile {
@@ -58,10 +59,12 @@ impl Pile {
         let hash = Pile::hash(&cards, count);
         match hashmap.get(&hash) {
             None => {
-                let new = Pile {
+                let mut new = Pile {
                     cards: *cards,
                     count: count,
+                    chaos: 0,
                 };
+                new.chaos = new.calculate_chaos();
                 hashmap.entry(hash).or_insert(new);
             }
             _ => (),
@@ -124,6 +127,37 @@ impl Pile {
     pub fn count(&self) -> usize {
         self.count
     }
+
+    pub fn chaos(&self) -> u32 {
+        self.chaos
+    }
+    fn calculate_chaos(&self) -> u32 {
+        let mut result = 0;
+        let mut lastcard = Card::new(0);
+        for i in 0..self.count {
+            let current = self.at(i);
+            if !current.faceup() {
+                result += 10;
+            } else {
+                // first in stack
+                if lastcard.value() == 0 {
+                    result += 2;
+                } else {
+                    if lastcard.rank() == current.rank() + 1 {
+                        if lastcard.suit() == current.suit() {
+                            result += 1;
+                        } else {
+                            result += 5;
+                        }
+                    } else {
+                        result += 3;
+                    }
+                }
+            }
+            lastcard = current;
+        }
+        result
+    }
 }
 
 #[cfg(test)]
@@ -168,5 +202,18 @@ mod piletests {
             hashmap.get(&new_pile).expect("valid pile").to_string(),
             "|AS |3S |AS |6S |3H 8S 7S 6S"
         );
+    }
+
+    #[test]
+    fn chaos() {
+        let mut hashmap = HashMap::new();
+        let pile = Pile::parse("|AS |3S |AS |6S |3H 8S", &mut hashmap).expect("parsed");
+        assert_eq!(hashmap.get(&pile).expect("valid pile").chaos(), 53);
+        let pile = Pile::parse("|TS 7S 6S", &mut hashmap).expect("parsed");
+        assert_eq!(hashmap.get(&pile).expect("valid pile").chaos(), 14);
+        let pile = Pile::parse("8S 7S 6S", &mut hashmap).expect("parsed");
+        assert_eq!(hashmap.get(&pile).expect("valid pile").chaos(), 4);
+        let pile = Pile::parse("8S 7H 6S", &mut hashmap).expect("parsed");
+        assert_eq!(hashmap.get(&pile).expect("valid pile").chaos(), 12);
     }
 }
