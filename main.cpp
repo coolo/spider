@@ -148,6 +148,7 @@ int main(int argc, char **argv)
         QString token;
         ts >> token;
 
+	qDebug() << "token" << token;
         if (token.startsWith("Play") || token.startsWith("Deal") || token.startsWith("Off"))
         {
             if (count >= 0)

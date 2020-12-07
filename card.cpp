@@ -74,7 +74,7 @@ Suit Card::char2suit(char c)
     case 'C':
         return Clubs;
     }
-    qDebug() << "No map for " << c;
+    qDebug() << "No suit map for" << c;
     exit(1);
     return Spades;
 }
@@ -110,7 +110,7 @@ Rank Card::char2rank(char c)
     case '9':
         return Nine;
     }
-    qDebug() << "No map for " << c;
+    qDebug() << "No rank for" << c;
     exit(1);
     return Ace;
 }

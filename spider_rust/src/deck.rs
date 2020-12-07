@@ -12,8 +12,9 @@ pub struct Deck {
 }
 
 impl Deck {
-    pub fn hash(&self) -> u64 {
+    pub fn hash(&self, seed: u32) -> u64 {
         let mut h = Hasher64::new();
+        h.write_u32(seed);
         for i in 0..10 {
             h.write_u64(self.play[i]);
         }
@@ -72,7 +73,7 @@ impl Deck {
             result += &format!("Play{}: {}\n", i, pilemap[&self.play[i]].to_string());
         }
         for i in 0..5 {
-            result += &format!("Deck{}: {}\n", i, pilemap[&self.talon[i]].to_string());
+            result += &format!("Deal{}: {}\n", i, pilemap[&self.talon[i]].to_string());
         }
         result += &format!("Off: {}", pilemap[&self.off].to_string());
         result
@@ -89,7 +90,7 @@ impl Deck {
                 break;
             }
         }
-        // an optimization - only move to first empty
+        // can't pull the talon if it turns true
         let mut one_is_empty = false;
 
         // translate ID into reference for quicker access
@@ -131,9 +132,12 @@ impl Deck {
                     return vec;
                 }
 
-                if index > 1 {
+                if prune && index > 0 {
                     let next_card = from_pile.at(index - 1);
-                    if next_card.suit() == top_suit && next_card.rank() == top_rank + 1 {
+                    if next_card.faceup()
+                        && next_card.suit() == top_suit
+                        && next_card.rank() == top_rank + 1
+                    {
                         //println!("Skip {} {}", current.to_string(), next_card.to_string());
                         index -= 1;
                         continue;
@@ -160,6 +164,10 @@ impl Deck {
                             continue;
                         }
                     } else {
+                        if index == 0 && next_talon.is_none() {
+                            // forbid moves between empty cells once the talons are gone
+                            continue;
+                        }
                         moved_to_empty = true;
                     }
                     vec.push(Move::regular(from, to, index));
@@ -171,6 +179,12 @@ impl Deck {
                 index -= 1;
             }
         }
+        if !prune {
+            if !one_is_empty && next_talon.is_some() {
+                vec.push(Move::from_talon(next_talon.unwrap()));
+            }
+            return vec;
+        }
         match self.prune_moves(&mut vec, &play_refs) {
             None => {
                 if !one_is_empty && next_talon.is_some() {
@@ -179,17 +193,7 @@ impl Deck {
                 vec
             }
             Some(m) => {
-                if !prune {
-                    return vec;
-                }
-                vec.retain(|&x| {
-                    // TODO use Eq
-                    x.from() == m.from()
-                        && x.to() == m.to()
-                        && !x.is_off()
-                        && x.index() == m.index()
-                        && !x.is_talon()
-                });
+                vec.retain(|&x| x == m);
                 vec
             }
         }
@@ -251,7 +255,7 @@ impl Deck {
         }
         for i in 0..5 {
             if !pilemap[&self.talon[i]].is_empty() {
-                result += 1000;
+                result += 40;
             }
         }
         result
@@ -310,11 +314,11 @@ Play6: |7S |QS |KH |4H 3H 2H
 Play7: |8S |JS |7S AS 5H 4H 2S AS KH QS 6S 5S 4S 3S
 Play8: 6S 5S 4S 3H 2H AH
 Play9: 5H
-Deck0: 
-Deck1: 
-Deck2: 
-Deck3: 
-Deck4: 
+Deal0: 
+Deal1: 
+Deal2: 
+Deal3: 
+Deal4: 
 Off: KS KH";
         let mut hashmap = HashMap::new();
         let deck = Deck::parse(&text.to_string(), &mut hashmap);
@@ -333,21 +337,21 @@ Play6: |7S |QS |KH |4H 3H 2H
 Play7: |8S |JS |7S 6S 5H 4H 2S AS KH QS 6S 5S 4S 3S
 Play8: 6S 5S 4S 3H 2H AH
 Play9: 5H
-Deck0: 
-Deck1: 
-Deck2: 
-Deck3: 
-Deck4: 
+Deal0: 
+Deal1: 
+Deal2: 
+Deal3: 
+Deal4: 
 Off: KS KH";
         let mut hashmap = HashMap::new();
         let deck = Deck::parse(&text.to_string(), &mut hashmap);
-        let moves = deck.get_moves(&hashmap);
+        let moves = deck.get_moves(&hashmap, true);
         // pick 2H+AH to move to 3H
         assert_eq!(moves.len(), 1);
         let m = moves[0];
-        assert_eq!(m.from, 2);
-        assert_eq!(m.to, 3);
-        assert_eq!(m.index, 7);
+        assert_eq!(m.from(), 2);
+        assert_eq!(m.to(), 3);
+        assert_eq!(m.index(), 7);
     }
 
     #[test]
@@ -362,24 +366,114 @@ Play6: |7S |QS |KH |4H 3H 2H
 Play7: |8S |JS |7S 6S 5H 4H 2S AS KH QS 6S 5S 4S 3S
 Play8: 6S 5S 4S 3H 2H AH
 Play9: 5H
-Deck0: 
-Deck1: 
-Deck2: 
-Deck3: 
-Deck4: 
+Deal0: 
+Deal1: 
+Deal2: 
+Deal3: 
+Deal4: 
 Off: KS KH";
         let mut hashmap = HashMap::new();
         let deck = Deck::parse(&text.to_string(), &mut hashmap);
-        let moves = deck.get_moves(&hashmap);
+        let moves = deck.get_moves(&hashmap, true);
         for m in &moves {
             deck.explain_move(m, &hashmap);
         }
         // pick 5H to move to 6H
         assert_eq!(moves.len(), 1);
         let m = moves[0];
-        assert_eq!(m.from, 9);
-        assert_eq!(m.to, 3);
-        assert_eq!(m.index, 0);
+        assert_eq!(m.from(), 9);
+        assert_eq!(m.to(), 3);
+        assert_eq!(m.index(), 0);
+    }
+
+    #[test]
+    fn dont_move_between_empty() {
+        let text = "Play0: 7H 6H 5H AS
+        Play1: 
+        Play2: KS
+        Play3: TH
+        Play4: |3S |9S |TS TH
+        Play5: |9S |9H 8H 4S
+        Play6: |7S |QS |KH |4H 3H 2S QH JH KH QH JS QS KS
+        Play7: |8S |JS |6S 7S
+        Play8: |6S |8S |AH |5S 4H 3H 2H AH
+        Play9: 5H 2H JH TS 9H 8H 7H 6H 5S 4S 3S 2S AS
+        Deal0: 
+        Deal1: 
+        Deal2: 
+        Deal3: 
+        Deal4: 
+        Off: KS KH KH KS";
+        let mut hashmap = HashMap::new();
+        let deck = Deck::parse(&text.to_string(), &mut hashmap);
+        let moves = deck.get_moves(&hashmap, true);
+        for m in &moves {
+            deck.explain_move(&m, &hashmap);
+            // all moves are to empty
+            assert_eq!(m.to(), 1);
+            // moves from empty to empty are forbidden
+            // if the talons are done
+            assert!(m.index() > 0);
+        }
+    }
+
+    #[test]
+    fn pick_good_ones() {
+        let text = "Play0: AS
+Play1: KS QS
+Play2: 2H AH
+Play3: 
+Play4: |TH |3S |TS 9S 8S
+Play5: |9S |9H 8H 7H 6H 5S 4S 3S 2S AS
+Play6: |7S |QS |KH |4H 3H 2S QH JH KH QH JS TH 9H 8H 7H 6H 5H 4H 3H 2H AH
+Play7: |8S |JS |7S 6S 5S 4S
+Play8: 6S 5H
+Play9: KS JH TS
+Deal0: 
+Deal1: 
+Deal2: 
+Deal3: 
+Deal4: 
+Off: KS KH KH KS";
+        let mut hashmap = HashMap::new();
+        let deck = Deck::parse(&text.to_string(), &mut hashmap);
+        let moves = deck.get_moves(&hashmap, true);
+        // pick 9S to move to TS to uncover the other TS
+        assert_eq!(moves.len(), 1);
+        let m = moves[0];
+        assert_eq!(m.from(), 4);
+        assert_eq!(m.to(), 9);
+        assert_eq!(m.index(), 3);
+    }
+
+    #[test]
+    fn pick_empty() {
+        let text = "Play0: AS
+Play1: KS QS
+Play2: 2H AH
+Play3: 
+Play4: |TH |3S |TS 9S 8S
+Play5: |9S |9H 8H 7H 6H 5S 4S 3S 2S AS
+Play6: |7S |QS |KH |4H 3H 2S QH JH KH QH JS TH 9H 8H 7H 6H 5H 4H 3H 2H AH
+Play7: |8S |JS |7S 6S 5S 4S
+Play8: 6S 5H
+Play9: TS JH KS
+Deal0: 
+Deal1: 
+Deal2: 
+Deal3: 
+Deal4: 
+Off: KS KH KH KS";
+        let mut hashmap = HashMap::new();
+        let deck = Deck::parse(&text.to_string(), &mut hashmap);
+        let moves = deck.get_moves(&hashmap, true);
+        for m in &moves {
+            deck.explain_move(m, &hashmap);
+            // all moves are to empty
+            assert_eq!(m.to(), 3);
+            // the first two piles should not move
+            assert!(m.from() > 3);
+        }
     }
 
     #[test]
@@ -394,11 +488,11 @@ Play6:
 Play7: 
 Play8: 
 Play9: 
-Deck0: 
-Deck1: 
-Deck2: 
-Deck3: 
-Deck4: 
+Deal0: 
+Deal1: 
+Deal2: 
+Deal3: 
+Deal4: 
 Off: KS KS KS KS KH KH KH KH";
         let mut hashmap = HashMap::new();
         let deck = Deck::parse(&text.to_string(), &mut hashmap);
@@ -417,11 +511,11 @@ Play6:
 Play7: 
 Play8: 
 Play9: 
-Deck0: 
-Deck1: 
-Deck2: 
-Deck3: 
-Deck4: 
+Deal0: 
+Deal1: 
+Deal2: 
+Deal3: 
+Deal4: 
 Off: KS KS KS KS KH KH KH";
         let mut hashmap = HashMap::new();
         let deck = Deck::parse(&text.to_string(), &mut hashmap);

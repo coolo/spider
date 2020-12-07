@@ -7,20 +7,21 @@ use deck::Deck;
 use moves::Move;
 use pile::Pile;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 
 fn visit(
     deck: Deck,
     pilemap: &mut HashMap<u64, Pile>,
-    visited: &mut BTreeMap<u64, u32>,
-    orig_min_chaos: u32,
+    visited: &mut BTreeMap<u64, i32>,
+    orig_min_chaos: i32,
     level: u32,
-) -> u32 {
-    if level == 10 {
+) -> i32 {
+    if level == 0 {
         return orig_min_chaos;
     }
     let mut min_chaos = orig_min_chaos;
-    let hash = deck.hash();
+    let hash = deck.hash(level);
     if let Some(chaos) = visited.get(&hash) {
         if *chaos < min_chaos {
             return *chaos;
@@ -28,7 +29,11 @@ fn visit(
         return min_chaos;
     }
 
-    let chaos = deck.chaos(&pilemap);
+    let mut chaos = deck.chaos(&pilemap) as i32;
+    if chaos == 0 {
+        // special case for won
+        chaos = 0 - level as i32;
+    }
     if chaos < min_chaos {
         min_chaos = chaos;
     }
@@ -37,10 +42,7 @@ fn visit(
     let moves = deck.get_moves(&pilemap, true);
     for m in &moves {
         let newdeck = deck.apply_move(m, pilemap);
-        if newdeck.is_won(&pilemap) {
-            return 0;
-        }
-        min_chaos = visit(newdeck, pilemap, visited, min_chaos, level + 1);
+        min_chaos = visit(newdeck, pilemap, visited, min_chaos, level - 1);
     }
     min_chaos
 }
@@ -50,10 +52,15 @@ fn main() {
     let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
     // need to make this implicit
     let mut pilemap: HashMap<u64, Pile> = HashMap::new();
-    let deck = Deck::parse(&contents, &mut pilemap);
+    let mut deck = Deck::parse(&contents, &mut pilemap);
+    let mut path = BTreeSet::new();
 
-    const MAX_CHAOS: u32 = 80000;
+    println!("{}\n{}", deck.chaos(&pilemap), deck.to_string(&pilemap));
+
+    const MAX_CHAOS: i32 = 80000;
+    let mut move_count = 0;
     loop {
+        path.insert(deck.hash(0));
         let moves = deck.get_moves(&pilemap, false);
         let mut bestchaos = MAX_CHAOS;
         // invalid move
@@ -62,14 +69,33 @@ fn main() {
             let mut visited = BTreeMap::new();
             deck.explain_move(m, &pilemap);
             let newdeck = deck.apply_move(m, &mut pilemap);
-
-            let newchaos = visit(newdeck, &mut pilemap, &mut visited, MAX_CHAOS, 0);
+            if path.contains(&newdeck.hash(0)) {
+                continue;
+            }
+            let newchaos = visit(newdeck, &mut pilemap, &mut visited, MAX_CHAOS, 20);
             println!("Visited in total: {} -> {}", visited.len(), newchaos);
             if newchaos < bestchaos {
                 bestchaos = newchaos;
                 bestmove = *m;
             }
         }
-        break;
+        if bestmove.from() == 11 {
+            println!("No moves found {}", deck.chaos(&pilemap));
+            if deck.chaos(&pilemap) == 0 {
+                println!("WON!");
+            }
+            break;
+        }
+        deck.explain_move(&bestmove, &pilemap);
+        deck = deck.apply_move(&bestmove, &mut pilemap);
+        if !bestmove.is_off() {
+            move_count += 1;
+        }
+        println!(
+            "{} {}\n{}",
+            move_count,
+            deck.chaos(&pilemap),
+            deck.to_string(&pilemap)
+        );
     }
 }
