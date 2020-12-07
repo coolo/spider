@@ -6,9 +6,9 @@ use std::hash::Hasher;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Deck {
-    play: [u64; 10],
-    talon: [u64; 5],
-    off: u64,
+    play: [u32; 10],
+    talon: [u32; 5],
+    off: u32,
 }
 
 impl Deck {
@@ -16,12 +16,12 @@ impl Deck {
         let mut h = Hasher64::new();
         h.write_u32(seed);
         for i in 0..10 {
-            h.write_u64(self.play[i]);
+            h.write_u32(self.play[i]);
         }
         for i in 0..5 {
-            h.write_u64(self.talon[i])
+            h.write_u32(self.talon[i])
         }
-        h.write_u64(self.off);
+        h.write_u32(self.off);
         h.finish()
     }
 

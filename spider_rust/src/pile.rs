@@ -15,10 +15,10 @@ pub struct PileManager {
     vec: Vec<Pile>,
 }
 
-impl Index<u64> for PileManager {
+impl Index<u32> for PileManager {
     type Output = Pile;
 
-    fn index(&self, index: u64) -> &Self::Output {
+    fn index(&self, index: u32) -> &Self::Output {
         &self.vec[index as usize]
     }
 }
@@ -38,7 +38,7 @@ impl PileManager {
         farm::hash64(cards)
     }
 
-    fn or_insert(&mut self, cards: &[u8; 104], count: usize) -> u64 {
+    fn or_insert(&mut self, cards: &[u8; 104], count: usize) -> u32 {
         let hash = PileManager::hash(&cards, count);
         match self.map.entry(hash) {
             Entry::Vacant(entry) => {
@@ -50,10 +50,11 @@ impl PileManager {
 
                 new.chaos = new.calculate_chaos();
                 self.vec.push(new);
-                entry.insert((self.vec.len() - 1) as u32);
-                (self.vec.len() - 1) as u64
+                let index = (self.vec.len() - 1) as u32;
+                entry.insert(index);
+                index
             }
-            Entry::Occupied(entry) => *entry.get() as u64,
+            Entry::Occupied(entry) => *entry.get(),
         }
     }
 }
@@ -77,7 +78,7 @@ impl Pile {
         Card::new(self.cards[index])
     }
 
-    pub fn parse(s: &str, pm: &mut PileManager) -> Option<u64> {
+    pub fn parse(s: &str, pm: &mut PileManager) -> Option<u32> {
         let mut count = 0;
         let mut cards = [0; 104];
         for card_string in s.split(' ') {
@@ -106,7 +107,7 @@ impl Pile {
         strings.join(" ")
     }
 
-    pub fn remove_cards(pile: u64, index: usize, pm: &mut PileManager) -> u64 {
+    pub fn remove_cards(pile: u32, index: usize, pm: &mut PileManager) -> u32 {
         // shadow
         let pile = &pm[pile];
         let mut newcards = pile.cards.clone();
@@ -122,7 +123,7 @@ impl Pile {
         pm.or_insert(&newcards, newcount)
     }
 
-    pub fn add_card(pile: u64, card: Card, pm: &mut PileManager) -> u64 {
+    pub fn add_card(pile: u32, card: Card, pm: &mut PileManager) -> u32 {
         let pile = &pm[pile];
         let mut newcards = pile.cards.clone();
         newcards[pile.count] = card.value();
@@ -130,7 +131,7 @@ impl Pile {
         pm.or_insert(&newcards, newcount)
     }
 
-    pub fn copy_from(pile: u64, orig_pile: u64, index: usize, pm: &mut PileManager) -> u64 {
+    pub fn copy_from(pile: u32, orig_pile: u32, index: usize, pm: &mut PileManager) -> u32 {
         let pile = &pm[pile];
         let orig_pile = &pm[orig_pile];
         let mut newcards = pile.cards.clone();
