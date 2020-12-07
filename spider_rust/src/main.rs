@@ -5,14 +5,13 @@ mod moves;
 mod pile;
 use deck::Deck;
 use moves::Move;
-use pile::Pile;
+use pile::PileManager;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
-use std::collections::HashMap;
 
 fn visit(
     deck: Deck,
-    pilemap: &mut HashMap<u64, Pile>,
+    pilemap: &mut PileManager,
     visited: &mut BTreeMap<u64, i32>,
     orig_min_chaos: i32,
     level: u32,
@@ -51,7 +50,7 @@ fn main() {
     let filename = std::env::args().nth(1).expect("no filename given");
     let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
     // need to make this implicit
-    let mut pilemap: HashMap<u64, Pile> = HashMap::new();
+    let mut pilemap = PileManager::new();
     let mut deck = Deck::parse(&contents, &mut pilemap);
     let mut path = BTreeSet::new();
 
