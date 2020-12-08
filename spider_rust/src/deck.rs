@@ -1,8 +1,8 @@
 use crate::moves::Move;
 use crate::pile::Pile;
-use crate::pile::PileManager;
 use fasthash::{farm::Hasher64, FastHasher};
 use std::hash::Hasher;
+use std::sync::Arc;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Deck {
@@ -25,11 +25,11 @@ impl Deck {
         h.finish()
     }
 
-    pub fn is_won(&self, pilemap: &PileManager) -> bool {
-        pilemap[self.off].count() == 8
+    pub fn is_won(&self) -> bool {
+        Pile::get(self.off).count() == 8
     }
 
-    pub fn parse(contents: &String, pilemap: &mut PileManager) -> Deck {
+    pub fn parse(contents: &String) -> Deck {
         let mut newdeck = Deck {
             play: [0; 10],
             talon: [0; 5],
@@ -49,7 +49,7 @@ impl Deck {
                     break;
                 }
                 Some(pile) => {
-                    let parsed = Pile::parse(pile, pilemap);
+                    let parsed = Pile::parse(pile);
                     match parsed {
                         None => panic!("Failed to parse {}", pile),
                         Some(pile) => match index {
@@ -66,24 +66,24 @@ impl Deck {
         newdeck
     }
 
-    pub fn to_string(&self, pilemap: &PileManager) -> String {
+    pub fn to_string(&self) -> String {
         let mut result = String::new();
         for i in 0..10 {
-            result += &format!("Play{}: {}\n", i, pilemap[self.play[i]].to_string());
+            result += &format!("Play{}: {}\n", i, Pile::get(self.play[i]).to_string());
         }
         for i in 0..5 {
-            result += &format!("Deal{}: {}\n", i, pilemap[self.talon[i]].to_string());
+            result += &format!("Deal{}: {}\n", i, Pile::get(self.talon[i]).to_string());
         }
-        result += &format!("Off: {}", pilemap[self.off].to_string());
+        result += &format!("Off: {}", Pile::get(self.off).to_string());
         result
     }
 
-    pub fn get_moves(&self, pilemap: &PileManager, prune: bool) -> Vec<Move> {
+    pub fn get_moves(&self, prune: bool) -> Vec<Move> {
         let mut vec = Vec::new();
 
         let mut next_talon: Option<usize> = None;
         for i in 0..5 {
-            let talon = &pilemap[self.talon[i]];
+            let talon = Pile::get(self.talon[i]);
             if !talon.is_empty() {
                 next_talon = Some(i);
                 break;
@@ -95,7 +95,7 @@ impl Deck {
         // translate ID into reference for quicker access
         let mut play_refs = Vec::new();
         for i in 0..10 {
-            play_refs.push(&pilemap[self.play[i]]);
+            play_refs.push(Pile::get(self.play[i]));
         }
 
         for from in 0..10 {
@@ -103,7 +103,7 @@ impl Deck {
                 one_is_empty = true;
                 continue;
             }
-            let from_pile = play_refs[from];
+            let from_pile = &play_refs[from];
             let mut index = from_pile.count() - 1;
             let top_card = from_pile.at(index);
 
@@ -148,7 +148,7 @@ impl Deck {
                     if to == from {
                         continue;
                     }
-                    let to_pile = play_refs[to];
+                    let to_pile = &play_refs[to];
                     let to_count = to_pile.count();
 
                     if to_count > 0 {
@@ -198,12 +198,12 @@ impl Deck {
         }
     }
 
-    fn prune_moves(&self, moves: &Vec<Move>, play_refs: &Vec<&Pile>) -> Option<Move> {
+    fn prune_moves(&self, moves: &Vec<Move>, play_refs: &Vec<Arc<Box<Pile>>>) -> Option<Move> {
         for m in moves {
             if m.is_off() || m.is_talon() {
                 continue;
             }
-            let to_pile = play_refs[m.to()];
+            let to_pile = &play_refs[m.to()];
             if to_pile.count() == 0 {
                 continue;
             }
@@ -217,7 +217,7 @@ impl Deck {
         None
     }
 
-    pub fn explain_move(&self, m: &Move, pilemap: &PileManager) -> () {
+    pub fn explain_move(&self, m: &Move) -> () {
         if m.is_talon() {
             println!("Draw another talon");
             return;
@@ -227,8 +227,8 @@ impl Deck {
             return;
         }
         // happy casting to avoid storing every index as 64 bits
-        let from_pile = &pilemap[self.play[m.from()]];
-        let to_pile = &pilemap[self.play[m.to()]];
+        let from_pile = Pile::get(self.play[m.from()]);
+        let to_pile = Pile::get(self.play[m.to()]);
         let from_card = from_pile.at(m.index()).to_string();
         let mut to_card = String::from("Empty");
         if to_pile.count() > 0 {
@@ -247,49 +247,43 @@ impl Deck {
         );
     }
 
-    pub fn chaos(&self, pilemap: &PileManager) -> u32 {
+    pub fn chaos(&self) -> u32 {
         let mut result = 0;
         for i in 0..10 {
-            result += pilemap[self.play[i]].chaos();
+            result += Pile::get(self.play[i]).chaos();
         }
         for i in 0..5 {
-            if !pilemap[self.talon[i]].is_empty() {
+            if !Pile::get(self.talon[i]).is_empty() {
                 result += 40;
             }
         }
         result
     }
 
-    pub fn apply_move(&self, m: &Move, mut pilemap: &mut PileManager) -> Deck {
+    pub fn apply_move(&self, m: &Move) -> Deck {
         let mut newdeck = self.clone();
 
         if m.is_talon() {
             let from_pile = m.from();
             for to in 0..10 {
-                let mut c = pilemap[self.talon[from_pile]].at(to);
+                let mut c = Pile::get(self.talon[from_pile]).at(to);
                 c.set_faceup(true);
-                newdeck.play[to] = Pile::add_card(self.play[to], c, &mut pilemap);
+                newdeck.play[to] = Pile::add_card(self.play[to], c);
             }
-            newdeck.talon[m.from()] = Pile::parse("", &mut pilemap).unwrap();
+            newdeck.talon[m.from()] = Pile::parse("").unwrap();
             return newdeck;
         }
 
         if m.is_off() {
             let from_index = m.from();
-            let from_pile = &pilemap[self.play[from_index]];
+            let from_pile = Pile::get(self.play[from_index]);
             let c = from_pile.at(from_pile.count() - 13);
-            newdeck.off = Pile::add_card(self.off, c, &mut pilemap);
-            newdeck.play[m.from()] =
-                Pile::remove_cards(self.play[m.from()], m.index(), &mut pilemap);
+            newdeck.off = Pile::add_card(self.off, c);
+            newdeck.play[m.from()] = Pile::remove_cards(self.play[m.from()], m.index());
             return newdeck;
         }
-        newdeck.play[m.to()] = Pile::copy_from(
-            self.play[m.to()],
-            self.play[m.from()],
-            m.index(),
-            &mut pilemap,
-        );
-        newdeck.play[m.from()] = Pile::remove_cards(self.play[m.from()], m.index(), &mut pilemap);
+        newdeck.play[m.to()] = Pile::copy_from(self.play[m.to()], self.play[m.from()], m.index());
+        newdeck.play[m.from()] = Pile::remove_cards(self.play[m.from()], m.index());
         newdeck
     }
 }
@@ -316,9 +310,8 @@ Deal2:
 Deal3: 
 Deal4: 
 Off: KS KH";
-        let mut hashmap = PileManager::new();
-        let deck = Deck::parse(&text.to_string(), &mut hashmap);
-        assert_eq!(deck.to_string(&hashmap), text);
+        let deck = Deck::parse(&text.to_string());
+        assert_eq!(deck.to_string(), text);
     }
 
     #[test]
@@ -339,9 +332,8 @@ Deal2:
 Deal3: 
 Deal4: 
 Off: KS KH";
-        let mut hashmap = PileManager::new();
-        let deck = Deck::parse(&text.to_string(), &mut hashmap);
-        let moves = deck.get_moves(&hashmap, true);
+        let deck = Deck::parse(&text.to_string());
+        let moves = deck.get_moves(true);
         // pick 2H+AH to move to 3H
         assert_eq!(moves.len(), 1);
         let m = moves[0];
@@ -368,11 +360,10 @@ Deal2:
 Deal3: 
 Deal4: 
 Off: KS KH";
-        let mut hashmap = PileManager::new();
-        let deck = Deck::parse(&text.to_string(), &mut hashmap);
-        let moves = deck.get_moves(&hashmap, true);
+        let deck = Deck::parse(&text.to_string());
+        let moves = deck.get_moves(true);
         for m in &moves {
-            deck.explain_move(m, &hashmap);
+            deck.explain_move(m);
         }
         // pick 5H to move to 6H
         assert_eq!(moves.len(), 1);
@@ -400,11 +391,10 @@ Off: KS KH";
         Deal3: 
         Deal4: 
         Off: KS KH KH KS";
-        let mut hashmap = PileManager::new();
-        let deck = Deck::parse(&text.to_string(), &mut hashmap);
-        let moves = deck.get_moves(&hashmap, true);
+        let deck = Deck::parse(&text.to_string());
+        let moves = deck.get_moves(true);
         for m in &moves {
-            deck.explain_move(&m, &hashmap);
+            deck.explain_move(&m);
             // all moves are to empty
             assert_eq!(m.to(), 1);
             // moves from empty to empty are forbidden
@@ -431,9 +421,8 @@ Deal2:
 Deal3: 
 Deal4: 
 Off: KS KH KH KS";
-        let mut hashmap = PileManager::new();
-        let deck = Deck::parse(&text.to_string(), &mut hashmap);
-        let moves = deck.get_moves(&hashmap, true);
+        let deck = Deck::parse(&text.to_string());
+        let moves = deck.get_moves(true);
         // pick 9S to move to TS to uncover the other TS
         assert_eq!(moves.len(), 1);
         let m = moves[0];
@@ -460,11 +449,10 @@ Deal2:
 Deal3: 
 Deal4: 
 Off: KS KH KH KS";
-        let mut hashmap = PileManager::new();
-        let deck = Deck::parse(&text.to_string(), &mut hashmap);
-        let moves = deck.get_moves(&hashmap, true);
+        let deck = Deck::parse(&text.to_string());
+        let moves = deck.get_moves(true);
         for m in &moves {
-            deck.explain_move(m, &hashmap);
+            deck.explain_move(m);
             // all moves are to empty
             assert_eq!(m.to(), 3);
             // the first two piles should not move
@@ -490,9 +478,8 @@ Deal2:
 Deal3: 
 Deal4: 
 Off: KS KS KS KS KH KH KH KH";
-        let mut hashmap = PileManager::new();
-        let deck = Deck::parse(&text.to_string(), &mut hashmap);
-        assert_eq!(deck.chaos(&hashmap), 0);
+        let deck = Deck::parse(&text.to_string());
+        assert_eq!(deck.chaos(), 0);
     }
 
     #[test]
@@ -513,8 +500,7 @@ Deal2:
 Deal3: 
 Deal4: 
 Off: KS KS KS KS KH KH KH";
-        let mut hashmap = PileManager::new();
-        let deck = Deck::parse(&text.to_string(), &mut hashmap);
-        assert_eq!(deck.chaos(&hashmap), 16);
+        let deck = Deck::parse(&text.to_string());
+        assert_eq!(deck.chaos(), 16);
     }
 }
