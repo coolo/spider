@@ -47,6 +47,15 @@ impl Move {
             index: index as u8,
         }
     }
+    pub fn invalid() -> Move {
+        Move {
+            talon: false,
+            off: false,
+            from: 11,
+            to: 0,
+            index: 0,
+        }
+    }
 
     pub fn from(&self) -> usize {
         self.from as usize
@@ -64,5 +73,9 @@ impl Move {
     }
     pub fn is_talon(&self) -> bool {
         self.talon
+    }
+
+    pub fn is_invalid(&self) -> bool {
+        self.from > 10
     }
 }

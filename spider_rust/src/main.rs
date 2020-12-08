@@ -5,8 +5,29 @@ mod moves;
 mod pile;
 use deck::Deck;
 use moves::Move;
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::collections::BinaryHeap;
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+struct WeightedMove {
+    m: Move,
+    weight: i32,
+}
+
+impl Ord for WeightedMove {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other.weight.cmp(&self.weight)
+    }
+}
+
+// `PartialOrd` needs to be implemented as well.
+impl PartialOrd for WeightedMove {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
 fn visit(deck: Deck, visited: &mut BTreeMap<u64, i32>, orig_min_chaos: i32, level: u32) -> i32 {
     if level == 0 {
@@ -39,6 +60,56 @@ fn visit(deck: Deck, visited: &mut BTreeMap<u64, i32>, orig_min_chaos: i32, leve
     min_chaos
 }
 
+fn play(deck: Deck, path: &mut BTreeSet<u64>, move_count: usize) -> bool {
+    path.insert(deck.hash(0));
+    let moves = deck.get_moves(false);
+    let mut ordered = BinaryHeap::new();
+    const MAX_CHAOS: i32 = 80000;
+    if move_count > 117 {
+        return false;
+    }
+    for m in &moves {
+        let mut visited = BTreeMap::new();
+        //deck.explain_move(m);
+        let newdeck = deck.apply_move(m);
+        if path.contains(&newdeck.hash(0)) {
+            continue;
+        }
+        let newchaos = visit(newdeck, &mut visited, MAX_CHAOS, 10);
+        //println!("Visited in total: {} -> {}", visited.len(), newchaos);
+        ordered.push(WeightedMove {
+            m: *m,
+            weight: newchaos,
+        });
+    }
+    if ordered.is_empty() {
+        println!("No moves found {}", deck.chaos());
+        if deck.chaos() == 0 {
+            println!("WON!");
+            return true;
+        }
+        return false;
+    }
+
+    let mut o = 0;
+    for bestmove in ordered {
+        o += 1;
+        deck.explain_move(&bestmove.m);
+        let new_deck = deck.apply_move(&bestmove.m);
+        let mut mc = move_count;
+        if !bestmove.m.is_off() {
+            mc += 1;
+        }
+        println!("{}/{} {}", move_count, o, deck.chaos());
+        //deck.to_string()
+        if play(new_deck, path, mc) {
+            deck.explain_move(&bestmove.m);
+            return true;
+        }
+    }
+    false
+}
+
 fn main() {
     let filename = std::env::args().nth(1).expect("no filename given");
     let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
@@ -47,40 +118,5 @@ fn main() {
 
     println!("{}\n{}", deck.chaos(), deck.to_string());
 
-    const MAX_CHAOS: i32 = 80000;
-    let mut move_count = 0;
-    loop {
-        path.insert(deck.hash(0));
-        let moves = deck.get_moves(false);
-        let mut bestchaos = MAX_CHAOS;
-        // invalid move
-        let mut bestmove = Move::off(11, 0);
-        for m in &moves {
-            let mut visited = BTreeMap::new();
-            deck.explain_move(m);
-            let newdeck = deck.apply_move(m);
-            if path.contains(&newdeck.hash(0)) {
-                continue;
-            }
-            let newchaos = visit(newdeck, &mut visited, MAX_CHAOS, 20);
-            println!("Visited in total: {} -> {}", visited.len(), newchaos);
-            if newchaos < bestchaos {
-                bestchaos = newchaos;
-                bestmove = *m;
-            }
-        }
-        if bestmove.from() == 11 {
-            println!("No moves found {}", deck.chaos());
-            if deck.chaos() == 0 {
-                println!("WON!");
-            }
-            break;
-        }
-        deck.explain_move(&bestmove);
-        deck = deck.apply_move(&bestmove);
-        if !bestmove.is_off() {
-            move_count += 1;
-        }
-        println!("{} {}\n{}", move_count, deck.chaos(), deck.to_string());
-    }
+    play(deck, &mut path, 0);
 }
