@@ -2,7 +2,7 @@ use crate::moves::Move;
 use crate::pile::Pile;
 use fasthash::{farm::Hasher64, FastHasher};
 use std::hash::Hasher;
-use std::sync::Arc;
+use std::rc::Rc;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Deck {
@@ -198,7 +198,7 @@ impl Deck {
         }
     }
 
-    fn prune_moves(&self, moves: &Vec<Move>, play_refs: &Vec<Arc<Box<Pile>>>) -> Option<Move> {
+    fn prune_moves(&self, moves: &Vec<Move>, play_refs: &Vec<Rc<Pile>>) -> Option<Move> {
         for m in moves {
             if m.is_off() || m.is_talon() {
                 continue;

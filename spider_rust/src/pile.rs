@@ -1,9 +1,8 @@
 use crate::card::Card;
 use fasthash::farm;
-use once_cell::sync::Lazy;
+use once_cell::unsync::Lazy;
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::RwLock;
+use std::rc::Rc;
 
 pub struct Pile {
     cards: [u8; 104],
@@ -13,10 +12,8 @@ pub struct Pile {
 
 pub struct PileManager {}
 
-unsafe impl Sync for PileManager {}
-
-static ARRAY: Lazy<RwLock<Vec<Arc<Box<Pile>>>>> = Lazy::new(|| RwLock::new(vec![]));
-static MAP: Lazy<RwLock<HashMap<u64, u32>>> = Lazy::new(|| RwLock::new(HashMap::new()));
+static mut ARRAY: Lazy<Vec<Rc<Pile>>> = Lazy::new(|| vec![]);
+static mut MAP: Lazy<HashMap<u64, u32>> = Lazy::new(|| HashMap::new());
 
 impl PileManager {
     fn hash(cards: &[u8; 104], count: usize) -> u64 {
@@ -28,14 +25,9 @@ impl PileManager {
 
     fn or_insert(cards: &[u8; 104], count: usize) -> u32 {
         let hash = PileManager::hash(&cards, count);
-        //println!("1or_insert {} -> {}", count, hash);
-        if let Some(pile) = MAP.read().unwrap().get(&hash) {
+        if let Some(pile) = unsafe { MAP.get(&hash) } {
             return *pile;
         }
-        //println!("2or_insert {} -> {}", count, hash);
-
-        let mut map_lock = MAP.write().unwrap();
-        let mut arr_lock = ARRAY.write().unwrap();
 
         let mut new = Pile {
             cards: *cards,
@@ -44,10 +36,12 @@ impl PileManager {
         };
 
         new.chaos = new.calculate_chaos();
-        arr_lock.push(Arc::new(Box::new(new)));
-        let index = (arr_lock.len() - 1) as u32;
-        map_lock.insert(hash, index);
-        index
+        unsafe {
+            ARRAY.push(Rc::new(new));
+            let index = (ARRAY.len() - 1) as u32;
+            MAP.insert(hash, index);
+            index
+        }
     }
 }
 
@@ -67,8 +61,8 @@ impl PartialEq for Pile {
 impl Eq for Pile {}
 
 impl Pile {
-    pub fn get(index: u32) -> Arc<Box<Pile>> {
-        Arc::clone(&ARRAY.read().unwrap()[index as usize])
+    pub fn get(index: u32) -> Rc<Pile> {
+        unsafe { Rc::clone(&ARRAY[index as usize]) }
     }
 
     pub fn at(&self, index: usize) -> Card {

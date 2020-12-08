@@ -7,7 +7,6 @@ use deck::Deck;
 use moves::Move;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
-use std::thread;
 
 fn visit(deck: Deck, visited: &mut BTreeMap<u64, i32>, orig_min_chaos: i32, level: u32) -> i32 {
     if level == 0 {
@@ -56,7 +55,6 @@ fn main() {
         let mut bestchaos = MAX_CHAOS;
         // invalid move
         let mut bestmove = Move::off(11, 0);
-        let mut handles = vec![];
         for m in &moves {
             let mut visited = BTreeMap::new();
             deck.explain_move(m);
@@ -64,19 +62,11 @@ fn main() {
             if path.contains(&newdeck.hash(0)) {
                 continue;
             }
-            let cloned_m = m.clone();
-            let handle = thread::spawn(move || {
-                let newchaos = visit(newdeck, &mut visited, MAX_CHAOS, 20);
-                println!("Visited in total: {} -> {}", visited.len(), newchaos);
-                (newchaos, cloned_m)
-            });
-            handles.push(handle);
-        }
-        for handle in handles {
-            let (newchaos, m2) = handle.join().unwrap();
+            let newchaos = visit(newdeck, &mut visited, MAX_CHAOS, 20);
+            println!("Visited in total: {} -> {}", visited.len(), newchaos);
             if newchaos < bestchaos {
                 bestchaos = newchaos;
-                bestmove = m2;
+                bestmove = *m;
             }
         }
         if bestmove.from() == 11 {
