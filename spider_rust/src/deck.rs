@@ -373,9 +373,6 @@ impl Deck {
                         }
                         let newdeck = deck.apply_move(m);
                         let hash = newdeck.hash(0);
-                        if visited.contains(&hash) {
-                            continue;
-                        }
                         if newdeck.is_won() {
                             println!("WON! {}", depth);
                             return Some(depth + 1);
@@ -400,16 +397,18 @@ impl Deck {
                     let mut onegood = false;
 
                     for candidate in candidates {
-                        if output {
-                            println!("Candidate {} {}", candidate.chaos, candidate.playable);
-                        }
                         if candidate.chaos < chaos || candidate.playable > playable {
                             onegood = true;
                         } else if onegood {
                             break;
                         }
-                        visited.insert(candidate.hash);
-                        new_unvisted.push_back(newdecks[candidate.deck]);
+                        if !visited.contains(&candidate.hash) {
+                            if output {
+                                println!("Candidate {} {}", candidate.chaos, candidate.playable);
+                            }
+                            visited.insert(candidate.hash);
+                            new_unvisted.push_back(newdecks[candidate.deck]);
+                        }
                     }
                 }
             }
@@ -710,25 +709,26 @@ Off: KS KS KS KS KH KH KH";
 
     #[test]
     fn shortest_path4() {
-        let text = "Play0: AS
-        Play1: KS QS JS
+        let text = "Play0: 
+        Play1: QH JH TH 
         Play2: 2H AH
         Play3: KS
-        Play4: |TH |3S |TS 9S 8S
-        Play5: |9S |9H 8H 7H 6H 5S 4S 3S 2S AS
-        Play6: |7S |QS |KH |4H 3H 2S QH JH  
-        Play7: |8S |JS |7S 6S 5S 4S
-        Play8: 6S 5H
-        Play9: TS 
+        Play4: 5S 4S 3S 2S AS  
+        Play5: |9S |9H 8H 7H 6H 5H  
+        Play6: |7S |QS |KH |4H 3H    
+        Play7: |8S JS TS 
+        Play8: 6S 
+        Play9:  
         Deal0: 
         Deal1: 
         Deal2: 
         Deal3: 
         Deal4: 
-        Off: KS KH KH KS KH";
+        Off: KS KH KH KS KH KS";
         let deck = Deck::parse(&text.to_string());
-        assert_eq!(deck.playable(), 86);
-        let res = deck.shortest_path(1000000);
+        assert_eq!(deck.playable(), 297);
+        // win in 17 moves after visiting ~300k
+        let res = deck.shortest_path(1000);
         assert!(res.is_none()); // not within 1000 visits
     }
 }
