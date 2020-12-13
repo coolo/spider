@@ -45,8 +45,9 @@ impl PileManager {
         new.playable = new.calculate_playable();
 
         {
-            ARRAY.write().push(Arc::new(new));
-            let index = (ARRAY.read().len() - 1) as u32;
+            let mut arr_lock = ARRAY.write();
+            arr_lock.push(Arc::new(new));
+            let index = (arr_lock.len() - 1) as u32;
             MAP.write().insert(hash, index);
             index
         }
@@ -191,9 +192,9 @@ impl Pile {
     }
 
     fn calculate_playable(&self) -> u32 {
-        if self.count < 1 {
+        /*if self.count < 1 {
             return 100;
-        }
+        }*/
         if self.count < 2 {
             return self.count as u32;
         }
@@ -275,6 +276,6 @@ mod piletests {
         let pile = Pile::parse("8S").expect("parsed");
         assert_eq!(Pile::get(pile).playable(), 1);
         let pile = Pile::parse("").expect("parsed");
-        assert_eq!(Pile::get(pile).playable(), 100);
+        assert_eq!(Pile::get(pile).playable(), 0);
     }
 }
