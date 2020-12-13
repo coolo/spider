@@ -120,5 +120,5 @@ fn main() {
     let deck = Deck::parse(&contents);
     //let mut path: BTreeSet<u64> = BTreeSet::new();
 
-    println!("{}", deck.shortest_path(cap, 50000000).expect("win"));
+    println!("{}", deck.shortest_path(cap, 50_000_000).expect("win"));
 }

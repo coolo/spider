@@ -10,11 +10,12 @@ use std::sync::mpsc::channel;
 use std::sync::Arc;
 use threadpool::Builder;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct Deck {
     play: [u32; 10],
     talon: [u32; 5],
     off: u32,
+    moves: Vec<Move>,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -65,6 +66,7 @@ impl Deck {
             play: [0; 10],
             talon: [0; 5],
             off: 0,
+            moves: vec![],
         };
         let mut index = 0;
         for line in contents.lines() {
@@ -304,6 +306,7 @@ impl Deck {
 
     pub fn apply_move(&self, m: &Move) -> Deck {
         let mut newdeck = self.clone();
+        newdeck.moves.push(*m);
 
         if m.is_talon() {
             let from_pile = m.from();
@@ -330,12 +333,11 @@ impl Deck {
     }
 
     fn pick_one_for_shortest_path(
-        deck: Deck,
+        deck: &Deck,
         visited: &RwLock<BTreeSet<u64>>,
-        depth: i32,
         new_unvisited: &RwLock<Vec<Deck>>,
         new_unvisited_tosort: &RwLock<Vec<WeightedMove>>,
-    ) -> Option<i32> {
+    ) -> Option<u64> {
         //let _output = visited.len() % 100000 == 0;
         let output = false;
         if output {
@@ -355,10 +357,7 @@ impl Deck {
             }
             let newdeck = deck.apply_move(m);
             let hash = newdeck.hash(0);
-            if newdeck.is_won() {
-                return Some(depth + 1);
-            }
-            newdecks.push(newdeck);
+            newdecks.push(newdeck.clone());
 
             let newplayable = newdeck.playable();
             let newchaos = newdeck.chaos();
@@ -391,7 +390,10 @@ impl Deck {
                     let mut visited_locked = visited.write();
                     let mut new_unvisited_locked = new_unvisited.write();
                     visited_locked.insert(candidate.hash);
-                    new_unvisited_locked.push(newdecks[candidate.deck]);
+                    new_unvisited_locked.push(newdecks[candidate.deck].clone());
+                    if newdecks[candidate.deck].is_won() {
+                        return Some(candidate.hash);
+                    }
                     let mut nc = candidate;
                     nc.deck = new_unvisited_locked.len() - 1;
                     new_unvisited_tosort.write().push(nc);
@@ -403,7 +405,7 @@ impl Deck {
 
     pub fn shortest_path(&self, cap: usize, limit: usize) -> Option<i32> {
         let mut unvisted: Vec<Deck> = Vec::new();
-        unvisted.push(*self);
+        unvisted.push(self.clone());
         // just append
         let new_unvisited: Arc<RwLock<Vec<Deck>>> = Arc::new(RwLock::new(Vec::new()));
         // sort only the index
@@ -422,16 +424,16 @@ impl Deck {
             }
             let (tx, rx) = channel();
             let mut n_jobs = 0;
-            for &deck in &unvisted {
+            for deck in &unvisted {
                 let tx = tx.clone();
                 let mut visited_cloned = Arc::clone(&visited);
                 let mut new_unvisited_cloned = Arc::clone(&new_unvisited);
                 let mut new_unvisited_tosort_cloned = Arc::clone(&new_unvisited_tosort);
+                let deck = deck.clone();
                 pool.execute(move || {
                     let ret = Deck::pick_one_for_shortest_path(
-                        deck,
+                        &deck,
                         &mut visited_cloned,
-                        depth,
                         &mut new_unvisited_cloned,
                         &mut new_unvisited_tosort_cloned,
                     );
@@ -441,11 +443,31 @@ impl Deck {
             }
             for _ in 0..n_jobs {
                 // the order is not important, this is only about the number of jobs
-                let result = rx.recv().expect("recv");
-                if result.is_some() {
+                if let Some(result) = rx.recv().expect("recv") {
                     pool.join();
                     println!("WON! {} {}", depth + 1, visited.read().len());
-                    return result;
+                    let new_unvisited_locked = new_unvisited.read();
+                    let mut iter = new_unvisited_locked.iter();
+                    loop {
+                        match iter.next() {
+                            None => break,
+                            Some(val) => {
+                                if result == val.hash(0) {
+                                    let mut mc = 0;
+                                    let mut orig = self.clone();
+                                    for m in &val.moves {
+                                        if !m.is_off() {
+                                            mc += 1;
+                                        }
+                                        print!("Move {}: ", mc);
+                                        orig.explain_move(&m);
+                                        orig = orig.apply_move(&m);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return Some(depth + 1);
                 }
             }
 
@@ -469,7 +491,7 @@ impl Deck {
                         //println!("{}", new_unvisited[wm.deck].to_string());
                         printed = true;
                     }
-                    unvisted.push(new_unvisited.read()[wm.deck]);
+                    unvisted.push(new_unvisited.read()[wm.deck].clone());
                 } else {
                     break;
                 }
@@ -725,7 +747,7 @@ Off: KS KS KS KS KH KH KH";
         Deal4: 
         Off: KS KS KS KS KH KH KH";
         let deck = Deck::parse(&text.to_string());
-        assert_eq!(deck.shortest_path(100).expect("winnable"), 3);
+        assert_eq!(deck.shortest_path(3400, 100).expect("winnable"), 3);
     }
 
     #[test]
@@ -751,7 +773,7 @@ Off: KS KS KS KS KH KH KH";
         Deal4: 
         Off: KS KH KH KS KS";
         let deck = Deck::parse(&text.to_string());
-        let res = deck.shortest_path(5000);
+        let res = deck.shortest_path(3400, 5000);
         //assert_eq!(res.expect("winnable"), 28);
         assert!(res.is_none()); // requires a little more capacity
     }
@@ -777,7 +799,7 @@ Off: KS KS KS KS KH KH KH";
         Off: KS KH KH KS KH KS";
         let deck = Deck::parse(&text.to_string());
         // win in 17 moves
-        let res = deck.shortest_path(80000);
+        let res = deck.shortest_path(3400, 80000);
         assert_eq!(res.expect("winnable"), 17);
     }
 
@@ -801,7 +823,7 @@ Off: KS KS KS KS KH KH KH";
         Off: KS";
         let deck = Deck::parse(&text.to_string());
         // win in 17 moves
-        let res = deck.shortest_path(50000);
+        let res = deck.shortest_path(3400, 50000);
         assert_eq!(res.expect("out of options"), -8);
     }
 }
