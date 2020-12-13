@@ -330,7 +330,7 @@ impl Deck {
         let mut unvisted: Vec<Deck> = Vec::new();
         unvisted.push(*self);
         // just append
-        let mut new_unvisited = Vec::new();
+        let mut new_unvisited: Vec<Deck> = Vec::new();
         // sort only the index
         let mut new_unvisited_tosort: Vec<WeightedMove> = Vec::new();
         let mut visited = BTreeSet::new();
@@ -348,7 +348,7 @@ impl Deck {
                     new_unvisited_tosort.reverse();
                     let mut iterator = new_unvisited_tosort.iter();
                     let mut printed = false;
-                    for _ in 0..3400 {
+                    for _ in 0..5400 {
                         if let Some(wm) = iterator.next() {
                             if !printed {
                                 println!(
@@ -358,6 +358,7 @@ impl Deck {
                                     wm.chaos,
                                     wm.playable
                                 );
+                                //println!("{}", new_unvisited[wm.deck].to_string());
                                 printed = true;
                             }
                             unvisted.push(new_unvisited[wm.deck]);
@@ -374,6 +375,7 @@ impl Deck {
                 }
                 Some(deck) => {
                     let output = visited.len() % 100000 == 0;
+                    let output = false;
                     if output {
                         println!("{} {} {}", deck.to_string(), deck.playable(), deck.chaos());
 
@@ -737,5 +739,29 @@ Off: KS KS KS KS KH KH KH";
         // win in 17 moves
         let res = deck.shortest_path(50000);
         assert_eq!(res.expect("winnable"), 17);
+    }
+
+    #[test]
+    fn shortest_path4() {
+        let text = "Play0: JS TS 9S 8S 7S 6S 5S 4S AS TH 9H 8H 7H 6H 5H 4H 3H 2H AH
+        Play1: KH QH JH 8H 6H 5H 4H 8H 2S AS
+        Play2: JH TS 9S 8S
+        Play3: KH TH 3S 2S KH QH
+        Play4: |8H |AH 7S 6S 5S 4S 3H 7H 6H 5H 4H KS QS 6H 5S 4S
+        Play5: 7H 7S TH 9H
+        Play6: |JH AH JS 9H KS QS 5H 8S
+        Play7: |7H |9S 6S JH KH 2H 3H 2H
+        Play8: TH 9H QS QH KS QH
+        Play9: 3S 2S AS JS 4H 3H 2H AH 3S TS
+        Deal0: 
+        Deal1: 
+        Deal2: 
+        Deal3: 
+        Deal4: 
+        Off: KS";
+        let deck = Deck::parse(&text.to_string());
+        // win in 17 moves
+        let res = deck.shortest_path(50000);
+        assert_eq!(res.expect("out of options"), -8);
     }
 }
