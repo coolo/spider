@@ -1,0 +1,17 @@
+# limited dec 18 2020
+Play0: |JS |9S |JS |2S |2S QS
+Play1: |QH |4S |8H |2H |8S 5H
+Play2: |4H |6S |8S |AS |9S 7S
+Play3: |KH |9H |4S |3S |3H JH
+Play4: |8H |AH |7S |5S 7S
+Play5: |7H |6H |3H |JH TS
+Play6: |JH |AH |6S |4S 7H
+Play7: |7H |9S |6S |KS 6S
+Play8: |TH |3H |5S |AS KH
+Play9: |3S |5S |9H |AS TS
+Deal0: 2H 8H 9S TH 7H TS JS JH QS JS
+Deal1: 6H 6H 5S 3S 2S 5H 9H KH QH 4H
+Deal2: AS 4H QS KH 5H 7S KS AH QS 4H
+Deal3: TH 8H 8S 2H KS TH 5H 2H AH 3S
+Deal4: 9H 2S QH QH 6H 4S 8S 3H KS TS
+Off:

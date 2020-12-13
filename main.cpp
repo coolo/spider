@@ -147,8 +147,12 @@ int main(int argc, char **argv)
     {
         QString token;
         ts >> token;
+        if (token.startsWith("#"))
+        {
+            ts.readLine();
+            continue;
+        }
 
-	qDebug() << "token" << token;
         if (token.startsWith("Play") || token.startsWith("Deal") || token.startsWith("Off"))
         {
             if (count >= 0)
@@ -165,6 +169,7 @@ int main(int argc, char **argv)
                 Card last(token.mid(4, 2));
                 while (first.rank >= last.rank)
                 {
+                    assert(required.contains(first));
                     required.removeOne(first);
                     cards[count++] = first;
                     first.rank = (Rank)(first.rank - 1);
@@ -178,11 +183,20 @@ int main(int argc, char **argv)
                     for (int rank = Ace; rank <= King; rank++)
                     {
                         c.rank = (Rank)rank;
+                        assert(required.contains(c));
                         required.removeOne(c);
                     }
                 }
                 else
                 {
+                    if (!c.unknown)
+                    {
+                        if (!required.contains(c))
+                        {
+                            qDebug() << "too many" << c;
+                            assert(required.contains(c));
+                        }
+                    }
                     required.removeOne(c);
                 }
                 cards[count++] = c;
@@ -194,9 +208,11 @@ int main(int argc, char **argv)
     srand(time(0));
     d->addPile(cards, count);
     d->assignLeftCards(required);
-    if (!required.empty()) {
-	    for (int i = 0; i < required.size(); i++) required[i].unknown = false;
-	    qDebug() << required;
+    if (!required.empty())
+    {
+        for (int i = 0; i < required.size(); i++)
+            required[i].unknown = false;
+        qDebug() << required;
     }
     Q_ASSERT(required.empty());
     d->calculateChaos();
@@ -221,16 +237,16 @@ int main(int argc, char **argv)
                 orig = *orig.applyMove(m, true);
             }
         }
-        if (lists[roundrobin].empty() || (rand() % lists[roundrobin].size() < 5))
+        if (lists[roundrobin].empty() || (rand() % lists[roundrobin].size() < 1))
             roundrobin = (roundrobin + 1) % 6;
         int sum = 0;
         for (int i = 0; i < 6; i++)
-           sum += lists[i].size();
+            sum += lists[i].size();
         if (!sum)
-         {
-             qDebug() << "ran out of options";
-             break;
-         }
+        {
+            qDebug() << "ran out of options";
+            break;
+        }
     } while (min_chaos > 0);
     for (int i = 0; i < 6; i++)
     {

@@ -75,8 +75,8 @@ fn play(deck: Deck, path: &mut BTreeSet<u64>, move_count: usize) -> bool {
         if path.contains(&newdeck.hash(0)) {
             continue;
         }
-        let newchaos = visit(newdeck, &mut visited, MAX_CHAOS, 10);
-        //println!("Visited in total: {} -> {}", visited.len(), newchaos);
+        let newchaos = visit(newdeck, &mut visited, MAX_CHAOS, 5);
+        println!("Visited in total: {} -> {}", visited.len(), newchaos);
         ordered.push(WeightedMove {
             m: *m,
             weight: newchaos,
@@ -113,7 +113,7 @@ fn play(deck: Deck, path: &mut BTreeSet<u64>, move_count: usize) -> bool {
 fn main() {
     let filename = std::env::args().nth(1).expect("no filename given");
     let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
-    let mut deck = Deck::parse(&contents);
+    let deck = Deck::parse(&contents);
     let mut path = BTreeSet::new();
 
     println!("{}\n{}", deck.chaos(), deck.to_string());

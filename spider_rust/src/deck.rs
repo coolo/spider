@@ -37,6 +37,9 @@ impl Deck {
         };
         let mut index = 0;
         for line in contents.lines() {
+            if line.starts_with("#") {
+                continue;
+            }
             let mut two = line.split(":");
             match two.next() {
                 None => {
@@ -63,6 +66,7 @@ impl Deck {
             }
             index += 1;
         }
+        assert_eq!(index, 16);
         newdeck
     }
 
