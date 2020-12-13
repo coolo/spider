@@ -112,9 +112,13 @@ fn play(deck: Deck, path: &mut BTreeSet<u64>, move_count: usize) -> bool {
 
 fn main() {
     let filename = std::env::args().nth(1).expect("no filename given");
+    let mut cap: usize = 50000;
+    if let Some(ncap) = std::env::args().nth(2) {
+        cap = ncap.parse().expect("Integer");
+    }
     let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
     let deck = Deck::parse(&contents);
     //let mut path: BTreeSet<u64> = BTreeSet::new();
 
-    println!("{}", deck.shortest_path(50000000).expect("win"));
+    println!("{}", deck.shortest_path(cap, 50000000).expect("win"));
 }

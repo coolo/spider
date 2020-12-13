@@ -401,7 +401,7 @@ impl Deck {
         None
     }
 
-    pub fn shortest_path(&self, limit: usize) -> Option<i32> {
+    pub fn shortest_path(&self, cap: usize, limit: usize) -> Option<i32> {
         let mut unvisted: Vec<Deck> = Vec::new();
         unvisted.push(*self);
         // just append
@@ -413,6 +413,7 @@ impl Deck {
         visited.write().insert(self.hash(0));
 
         let mut depth: i32 = 0;
+        // TODO need to find out where a 2nd thread kills it
         let pool = Builder::new().num_threads(1).build();
 
         loop {
@@ -421,7 +422,6 @@ impl Deck {
             }
             let (tx, rx) = channel();
             let mut n_jobs = 0;
-            println!("Forking {} threads", unvisted.len());
             for &deck in &unvisted {
                 let tx = tx.clone();
                 let mut visited_cloned = Arc::clone(&visited);
@@ -456,7 +456,7 @@ impl Deck {
 
             let mut iterator = new_unvisited_tosort_locked.iter();
             let mut printed = false;
-            for _ in 0..5400 {
+            for _ in 0..cap {
                 if let Some(wm) = iterator.next() {
                     if !printed {
                         println!(
