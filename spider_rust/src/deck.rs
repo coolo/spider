@@ -1,6 +1,10 @@
 use crate::moves::Move;
 use crate::pile::Pile;
 use fasthash::{farm::Hasher64, FastHasher};
+use std::cmp::Ordering;
+use std::collections::BTreeSet;
+use std::collections::BinaryHeap;
+use std::collections::VecDeque;
 use std::hash::Hasher;
 use std::sync::Arc;
 
@@ -9,6 +13,29 @@ pub struct Deck {
     play: [u32; 10],
     talon: [u32; 5],
     off: u32,
+}
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+struct WeightedMove {
+    deck: usize,
+    chaos: u32,
+    playable: u32,
+    hash: u64,
+}
+
+impl Ord for WeightedMove {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.playable
+            .cmp(&other.playable)
+            .then(other.chaos.cmp(&self.chaos))
+    }
+}
+
+// `PartialOrd` needs to be implemented as well.
+impl PartialOrd for WeightedMove {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl Deck {
@@ -147,6 +174,7 @@ impl Deck {
                         continue;
                     }
                 }
+
                 let mut moved_to_empty = false;
 
                 for to in 0..10 {
@@ -205,9 +233,7 @@ impl Deck {
 
     fn prune_moves(&self, moves: &Vec<Move>, play_refs: &Vec<Arc<Pile>>) -> Option<Move> {
         for m in moves {
-            if m.is_off() || m.is_talon() {
-                continue;
-            }
+            assert!(!m.is_off() && !m.is_talon());
             let to_pile = &play_refs[m.to()];
             if to_pile.count() == 0 {
                 continue;
@@ -298,6 +324,98 @@ impl Deck {
         newdeck.play[m.to()] = Pile::copy_from(self.play[m.to()], self.play[m.from()], m.index());
         newdeck.play[m.from()] = Pile::remove_cards(self.play[m.from()], m.index());
         newdeck
+    }
+
+    pub fn shortest_path(&self, limit: usize) -> Option<i32> {
+        let mut unvisted: VecDeque<Deck> = VecDeque::new();
+        unvisted.push_back(*self);
+        let mut new_unvisted = VecDeque::new();
+        let mut visited = BTreeSet::new();
+        visited.insert(self.hash(0));
+
+        let mut depth = 0;
+
+        loop {
+            if visited.len() > limit {
+                return None;
+            }
+            match unvisted.pop_front() {
+                None => {
+                    unvisted.append(&mut new_unvisted);
+                    depth += 1;
+                    if unvisted.len() == 0 {
+                        break;
+                    }
+                }
+                Some(deck) => {
+                    let output = visited.len() % 1000 == 0;
+                    if output {
+                        println!("{} {} {}", deck.to_string(), deck.playable(), deck.chaos());
+
+                        println!(
+                            "{} Visited: {} unvisited: {}",
+                            depth,
+                            visited.len(),
+                            unvisted.len(),
+                        );
+                    }
+
+                    let moves = deck.get_moves(false);
+                    let mut candidates = BinaryHeap::new();
+                    let playable = deck.playable();
+                    let chaos = deck.chaos();
+                    // we have one sorted and one unsorted to avoid the sorting
+                    // copying decks
+                    let mut newdecks = vec![];
+                    for m in &moves {
+                        if output {
+                            deck.explain_move(m);
+                        }
+                        let newdeck = deck.apply_move(m);
+                        let hash = newdeck.hash(0);
+                        if visited.contains(&hash) {
+                            continue;
+                        }
+                        if newdeck.is_won() {
+                            println!("WON! {}", depth);
+                            return Some(depth + 1);
+                        }
+                        newdecks.push(newdeck);
+
+                        let newplayable = newdeck.playable();
+                        let newchaos = newdeck.chaos();
+                        if output {
+                            println!(
+                                "PLAY {} -> {} CHAOS {} -> {}",
+                                playable, newplayable, chaos, newchaos
+                            );
+                        }
+                        candidates.push(WeightedMove {
+                            chaos: newchaos,
+                            playable: newplayable,
+                            hash: hash,
+                            deck: newdecks.len() - 1,
+                        });
+                    }
+                    let mut onegood = false;
+
+                    for candidate in candidates {
+                        if output {
+                            println!("Candidate {} {}", candidate.chaos, candidate.playable);
+                        }
+                        if candidate.chaos < chaos || candidate.playable > playable {
+                            onegood = true;
+                        } else if onegood {
+                            break;
+                        }
+                        visited.insert(candidate.hash);
+                        new_unvisted.push_back(newdecks[candidate.deck]);
+                    }
+                }
+            }
+        }
+
+        Some(-1 * depth)
     }
 }
 
@@ -493,7 +611,7 @@ Deal4:
 Off: KS KS KS KS KH KH KH KH";
         let deck = Deck::parse(&text.to_string());
         assert_eq!(deck.chaos(), 0);
-        assert_eq!(deck.playable(), 104);
+        assert_eq!(deck.playable(), 1104);
     }
 
     #[test]
@@ -516,6 +634,101 @@ Deal4:
 Off: KS KS KS KS KH KH KH";
         let deck = Deck::parse(&text.to_string());
         assert_eq!(deck.chaos(), 16);
-        assert_eq!(deck.playable(), 104);
+        assert_eq!(deck.playable(), 804);
+    }
+
+    #[test]
+    fn shortest_path1() {
+        let text = "Play0: KH QH JH TH 
+        Play1: 9H 
+        Play2: 8H 7H 6H 5H 4H 3H 2H AH
+        Play3: 
+        Play4: 
+        Play5: 
+        Play6: 
+        Play7: 
+        Play8: 
+        Play9: 
+        Deal0: 
+        Deal1: 
+        Deal2: 
+        Deal3: 
+        Deal4: 
+        Off: KS KS KS KS KH KH KH";
+        let deck = Deck::parse(&text.to_string());
+        assert_eq!(deck.shortest_path(100).expect("winnable"), 3);
+    }
+
+    #[test]
+    fn shortest_path2() {
+        let text = "Play0: TH 9H 8H 7H 6H 5H 4H 3H
+        Play1: 7S
+        Play2: KS
+        Play3: TH 9S
+        Play4: JS
+        Play5: 
+        Play6: |AS |QS |KH |4H 3H 2S QH JH KH QH
+        Play7: 2H AH
+        Play8: |6S |8S AH
+        Play9: 5H 2H JH TS 9H 8H 7H 6H 5S 4S 3S
+        Deal0: 
+        Deal1: 
+        Deal2: 
+        Deal3: 
+        Deal4: 
+        Off: KS KH KH KS KS";
+        let deck = Deck::parse(&text.to_string());
+        assert_eq!(deck.playable(), 185);
+        let res = deck.shortest_path(100000);
+        assert!(res.is_some());
+        assert_eq!(res.unwrap(), 143);
+    }
+
+    #[test]
+    fn shortest_path3() {
+        let text = "Play0: AS
+        Play1: KS QS
+        Play2: 2H AH
+        Play3: 
+        Play4: |TH |3S |TS 9S 8S
+        Play5: |9S |9H 8H 7H 6H 5S 4S 3S 2S AS
+        Play6: |7S |QS |KH |4H 3H 2S QH JH KH QH JS TH 9H 8H 7H 6H 5H 4H 3H 2H AH
+        Play7: |8S |JS |7S 6S 5S 4S
+        Play8: 6S 5H
+        Play9: TS JH KS
+        Deal0: 
+        Deal1: 
+        Deal2: 
+        Deal3: 
+        Deal4: 
+        Off: KS KH KH KS";
+        let deck = Deck::parse(&text.to_string());
+        assert_eq!(deck.playable(), 179);
+        let res = deck.shortest_path(1000);
+        assert!(res.is_none()); // not within 1000 visits
+    }
+
+    #[test]
+    fn shortest_path4() {
+        let text = "Play0: AS
+        Play1: KS QS JS
+        Play2: 2H AH
+        Play3: KS
+        Play4: |TH |3S |TS 9S 8S
+        Play5: |9S |9H 8H 7H 6H 5S 4S 3S 2S AS
+        Play6: |7S |QS |KH |4H 3H 2S QH JH  
+        Play7: |8S |JS |7S 6S 5S 4S
+        Play8: 6S 5H
+        Play9: TS 
+        Deal0: 
+        Deal1: 
+        Deal2: 
+        Deal3: 
+        Deal4: 
+        Off: KS KH KH KS KH";
+        let deck = Deck::parse(&text.to_string());
+        assert_eq!(deck.playable(), 86);
+        let res = deck.shortest_path(1000000);
+        assert!(res.is_none()); // not within 1000 visits
     }
 }

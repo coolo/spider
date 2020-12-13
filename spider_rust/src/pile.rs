@@ -191,6 +191,9 @@ impl Pile {
     }
 
     fn calculate_playable(&self) -> u32 {
+        if self.count < 1 {
+            return 100;
+        }
         if self.count < 2 {
             return self.count as u32;
         }
@@ -272,6 +275,6 @@ mod piletests {
         let pile = Pile::parse("8S").expect("parsed");
         assert_eq!(Pile::get(pile).playable(), 1);
         let pile = Pile::parse("").expect("parsed");
-        assert_eq!(Pile::get(pile).playable(), 0);
+        assert_eq!(Pile::get(pile).playable(), 100);
     }
 }
