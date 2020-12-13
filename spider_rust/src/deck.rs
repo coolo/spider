@@ -1,11 +1,14 @@
 use crate::moves::Move;
 use crate::pile::Pile;
 use fasthash::{farm::Hasher64, FastHasher};
+use parking_lot::RwLock;
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::collections::BinaryHeap;
 use std::hash::Hasher;
+use std::sync::mpsc::channel;
 use std::sync::Arc;
+use threadpool::Builder;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Deck {
@@ -328,23 +331,15 @@ impl Deck {
 
     fn pick_one_for_shortest_path(
         deck: Deck,
-        visited: &mut BTreeSet<u64>,
+        visited: &RwLock<BTreeSet<u64>>,
         depth: i32,
-        unvisted: &mut Vec<Deck>,
-        new_unvisited: &mut Vec<Deck>,
-        new_unvisited_tosort: &mut Vec<WeightedMove>,
+        new_unvisited: &RwLock<Vec<Deck>>,
+        new_unvisited_tosort: &RwLock<Vec<WeightedMove>>,
     ) -> Option<i32> {
-        let output = visited.len() % 100000 == 0;
+        //let _output = visited.len() % 100000 == 0;
         let output = false;
         if output {
             println!("{} {} {}", deck.to_string(), deck.playable(), deck.chaos());
-
-            println!(
-                "{} Visited: {} unvisited: {}",
-                depth,
-                visited.len(),
-                unvisted.len(),
-            );
         }
 
         let moves = deck.get_moves(false);
@@ -354,8 +349,6 @@ impl Deck {
         // we have one sorted and one unsorted to avoid the sorting
         // copying decks
         let mut newdecks = vec![];
-        let n_workers = 2;
-        //let pool = ThreadPool::new(n_workers);
         for m in &moves {
             if output {
                 deck.explain_move(m);
@@ -363,7 +356,6 @@ impl Deck {
             let newdeck = deck.apply_move(m);
             let hash = newdeck.hash(0);
             if newdeck.is_won() {
-                println!("WON! {} {}", depth + 1, visited.len());
                 return Some(depth + 1);
             }
             newdecks.push(newdeck);
@@ -391,15 +383,19 @@ impl Deck {
             } else if onegood {
                 break;
             }
-            if !visited.contains(&candidate.hash) {
+            if !visited.read().contains(&candidate.hash) {
                 if output {
                     println!("Candidate {} {}", candidate.chaos, candidate.playable);
                 }
-                visited.insert(candidate.hash);
-                new_unvisited.push(newdecks[candidate.deck]);
-                let mut nc = candidate;
-                nc.deck = new_unvisited.len() - 1;
-                new_unvisited_tosort.push(nc);
+                {
+                    let mut visited_locked = visited.write();
+                    let mut new_unvisited_locked = new_unvisited.write();
+                    visited_locked.insert(candidate.hash);
+                    new_unvisited_locked.push(newdecks[candidate.deck]);
+                    let mut nc = candidate;
+                    nc.deck = new_unvisited_locked.len() - 1;
+                    new_unvisited_tosort.write().push(nc);
+                }
             }
         }
         None
@@ -409,62 +405,82 @@ impl Deck {
         let mut unvisted: Vec<Deck> = Vec::new();
         unvisted.push(*self);
         // just append
-        let mut new_unvisited: Vec<Deck> = Vec::new();
+        let new_unvisited: Arc<RwLock<Vec<Deck>>> = Arc::new(RwLock::new(Vec::new()));
         // sort only the index
-        let mut new_unvisited_tosort: Vec<WeightedMove> = Vec::new();
-        let mut visited = BTreeSet::new();
-        visited.insert(self.hash(0));
+        let new_unvisited_tosort: Arc<RwLock<Vec<WeightedMove>>> =
+            Arc::new(RwLock::new(Vec::new()));
+        let visited = Arc::new(RwLock::new(BTreeSet::new()));
+        visited.write().insert(self.hash(0));
 
         let mut depth: i32 = 0;
+        let pool = Builder::new().num_threads(1).build();
 
         loop {
-            if visited.len() > limit {
+            if visited.read().len() > limit {
                 return None;
             }
-            match unvisted.pop() {
-                None => {
-                    new_unvisited_tosort.sort_unstable();
-                    new_unvisited_tosort.reverse();
-                    let mut iterator = new_unvisited_tosort.iter();
-                    let mut printed = false;
-                    for _ in 0..5400 {
-                        if let Some(wm) = iterator.next() {
-                            if !printed {
-                                println!(
-                                    "{}/{} {} {}",
-                                    depth,
-                                    new_unvisited.len(),
-                                    wm.chaos,
-                                    wm.playable
-                                );
-                                //println!("{}", new_unvisited[wm.deck].to_string());
-                                printed = true;
-                            }
-                            unvisted.push(new_unvisited[wm.deck]);
-                        } else {
-                            break;
-                        }
-                    }
-                    new_unvisited_tosort.clear();
-                    new_unvisited.clear();
-                    depth += 1;
-                    if unvisted.len() == 0 {
-                        break;
-                    }
-                }
-                Some(deck) => {
+            let (tx, rx) = channel();
+            let mut n_jobs = 0;
+            println!("Forking {} threads", unvisted.len());
+            for &deck in &unvisted {
+                let tx = tx.clone();
+                let mut visited_cloned = Arc::clone(&visited);
+                let mut new_unvisited_cloned = Arc::clone(&new_unvisited);
+                let mut new_unvisited_tosort_cloned = Arc::clone(&new_unvisited_tosort);
+                pool.execute(move || {
                     let ret = Deck::pick_one_for_shortest_path(
                         deck,
-                        &mut visited,
+                        &mut visited_cloned,
                         depth,
-                        &mut unvisted,
-                        &mut new_unvisited,
-                        &mut new_unvisited_tosort,
+                        &mut new_unvisited_cloned,
+                        &mut new_unvisited_tosort_cloned,
                     );
-                    if ret.is_some() {
-                        return ret;
-                    }
+                    tx.send(ret).expect("sent");
+                });
+                n_jobs += 1;
+            }
+            for _ in 0..n_jobs {
+                // the order is not important, this is only about the number of jobs
+                let result = rx.recv().expect("recv");
+                if result.is_some() {
+                    pool.join();
+                    println!("WON! {} {}", depth + 1, visited.read().len());
+                    return result;
                 }
+            }
+
+            unvisted.clear();
+            let mut new_unvisited_tosort_locked = new_unvisited_tosort.write();
+            new_unvisited_tosort_locked.sort_unstable();
+            new_unvisited_tosort_locked.reverse();
+
+            let mut iterator = new_unvisited_tosort_locked.iter();
+            let mut printed = false;
+            for _ in 0..5400 {
+                if let Some(wm) = iterator.next() {
+                    if !printed {
+                        println!(
+                            "{}/{} {} {}",
+                            depth,
+                            new_unvisited.read().len(),
+                            wm.chaos,
+                            wm.playable
+                        );
+                        //println!("{}", new_unvisited[wm.deck].to_string());
+                        printed = true;
+                    }
+                    unvisted.push(new_unvisited.read()[wm.deck]);
+                } else {
+                    break;
+                }
+            }
+
+            new_unvisited_tosort_locked.clear();
+            new_unvisited.write().clear();
+
+            depth += 1;
+            if unvisted.len() == 0 {
+                break;
             }
         }
 
