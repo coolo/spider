@@ -42,8 +42,8 @@ fn visit(deck: Deck, visited: &mut BTreeMap<u64, i32>, orig_min_chaos: i32, leve
         return min_chaos;
     }
 
-    let mut chaos = deck.chaos() as i32;
-    if chaos == 0 {
+    let mut chaos = deck.playable() as i32;
+    if chaos == 104 {
         // special case for won
         chaos = 0 - level as i32;
     }
@@ -65,7 +65,7 @@ fn play(deck: Deck, path: &mut BTreeSet<u64>, move_count: usize) -> bool {
     let moves = deck.get_moves(false);
     let mut ordered = BinaryHeap::new();
     const MAX_CHAOS: i32 = 80000;
-    if move_count > 117 {
+    if move_count > 30 {
         return false;
     }
     for m in &moves {
@@ -76,7 +76,7 @@ fn play(deck: Deck, path: &mut BTreeSet<u64>, move_count: usize) -> bool {
             continue;
         }
         let newchaos = visit(newdeck, &mut visited, MAX_CHAOS, 5);
-        println!("Visited in total: {} -> {}", visited.len(), newchaos);
+        //println!("Visited in total: {} -> {}", visited.len(), newchaos);
         ordered.push(WeightedMove {
             m: *m,
             weight: newchaos,
@@ -91,16 +91,16 @@ fn play(deck: Deck, path: &mut BTreeSet<u64>, move_count: usize) -> bool {
         return false;
     }
 
-    let mut o = 0;
+    let mut _o = 0;
     for bestmove in ordered {
-        o += 1;
-        deck.explain_move(&bestmove.m);
+        _o += 1;
+        //deck.explain_move(&bestmove.m);
         let new_deck = deck.apply_move(&bestmove.m);
         let mut mc = move_count;
         if !bestmove.m.is_off() {
             mc += 1;
         }
-        println!("{}/{} {}", move_count, o, deck.chaos());
+        //println!("{}/{} {}", move_count, o, deck.chaos());
         //deck.to_string()
         if play(new_deck, path, mc) {
             deck.explain_move(&bestmove.m);

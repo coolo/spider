@@ -47,6 +47,7 @@ impl Move {
             index: index as u8,
         }
     }
+    #[allow(dead_code)]
     pub fn invalid() -> Move {
         Move {
             talon: false,
@@ -74,7 +75,7 @@ impl Move {
     pub fn is_talon(&self) -> bool {
         self.talon
     }
-
+    #[allow(dead_code)]
     pub fn is_invalid(&self) -> bool {
         self.from > 10
     }

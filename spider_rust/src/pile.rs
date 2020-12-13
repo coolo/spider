@@ -1,19 +1,21 @@
 use crate::card::Card;
 use fasthash::farm;
-use once_cell::unsync::Lazy;
+use once_cell::sync::Lazy;
+use parking_lot::RwLock;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct Pile {
     cards: [u8; 104],
     count: usize,
     chaos: u32,
+    playable: u32,
 }
 
 pub struct PileManager {}
 
-static mut ARRAY: Lazy<Vec<Rc<Pile>>> = Lazy::new(|| vec![]);
-static mut MAP: Lazy<HashMap<u64, u32>> = Lazy::new(|| HashMap::new());
+static ARRAY: Lazy<RwLock<Vec<Arc<Pile>>>> = Lazy::new(|| RwLock::new(vec![]));
+static MAP: Lazy<RwLock<HashMap<u64, u32>>> = Lazy::new(|| RwLock::new(HashMap::new()));
 
 impl PileManager {
     fn hash(cards: &[u8; 104], count: usize) -> u64 {
@@ -25,21 +27,27 @@ impl PileManager {
 
     fn or_insert(cards: &[u8; 104], count: usize) -> u32 {
         let hash = PileManager::hash(&cards, count);
-        if let Some(pile) = unsafe { MAP.get(&hash) } {
-            return *pile;
+        {
+            let rlock = MAP.read();
+            if let Some(pile) = rlock.get(&hash) {
+                return *pile;
+            }
         }
 
         let mut new = Pile {
             cards: *cards,
             count: count,
             chaos: 0,
+            playable: 0,
         };
 
         new.chaos = new.calculate_chaos();
-        unsafe {
-            ARRAY.push(Rc::new(new));
-            let index = (ARRAY.len() - 1) as u32;
-            MAP.insert(hash, index);
+        new.playable = new.calculate_playable();
+
+        {
+            ARRAY.write().push(Arc::new(new));
+            let index = (ARRAY.read().len() - 1) as u32;
+            MAP.write().insert(hash, index);
             index
         }
     }
@@ -61,8 +69,8 @@ impl PartialEq for Pile {
 impl Eq for Pile {}
 
 impl Pile {
-    pub fn get(index: u32) -> Rc<Pile> {
-        unsafe { Rc::clone(&ARRAY[index as usize]) }
+    pub fn get(index: u32) -> Arc<Pile> {
+        Arc::clone(&ARRAY.read()[index as usize])
     }
 
     pub fn at(&self, index: usize) -> Card {
@@ -148,6 +156,7 @@ impl Pile {
     pub fn chaos(&self) -> u32 {
         self.chaos
     }
+
     fn calculate_chaos(&self) -> u32 {
         let mut result = 0;
         let mut lastcard = Card::new(0);
@@ -174,6 +183,35 @@ impl Pile {
             lastcard = current;
         }
         result
+    }
+
+    #[allow(dead_code)]
+    pub fn playable(&self) -> u32 {
+        self.playable
+    }
+
+    fn calculate_playable(&self) -> u32 {
+        if self.count < 2 {
+            return self.count as u32;
+        }
+        let mut index = self.count - 1;
+        let mut topcard = self.at(index);
+        index -= 1;
+        loop {
+            let current = self.at(index);
+            if current.suit() != topcard.suit()
+                || !current.faceup()
+                || current.rank() != topcard.rank() + 1
+            {
+                break;
+            }
+            if index == 0 {
+                return self.count as u32;
+            }
+            index -= 1;
+            topcard = current;
+        }
+        (self.count - index - 1) as u32
     }
 }
 
@@ -219,5 +257,21 @@ mod piletests {
         assert_eq!(Pile::get(pile).chaos(), 4);
         let pile = Pile::parse("8S 7H 6S").expect("parsed");
         assert_eq!(Pile::get(pile).chaos(), 12);
+    }
+
+    #[test]
+    fn playable() {
+        let pile = Pile::parse("|AS |3S |AS |6S |3H 8S").expect("parsed");
+        assert_eq!(Pile::get(pile).playable(), 1);
+        let pile = Pile::parse("|8S 7S 6S").expect("parsed");
+        assert_eq!(Pile::get(pile).playable(), 2);
+        let pile = Pile::parse("8S 7S 6S").expect("parsed");
+        assert_eq!(Pile::get(pile).playable(), 3);
+        let pile = Pile::parse("8S 7H 6S").expect("parsed");
+        assert_eq!(Pile::get(pile).playable(), 1);
+        let pile = Pile::parse("8S").expect("parsed");
+        assert_eq!(Pile::get(pile).playable(), 1);
+        let pile = Pile::parse("").expect("parsed");
+        assert_eq!(Pile::get(pile).playable(), 0);
     }
 }

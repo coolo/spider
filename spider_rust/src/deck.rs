@@ -2,7 +2,7 @@ use crate::moves::Move;
 use crate::pile::Pile;
 use fasthash::{farm::Hasher64, FastHasher};
 use std::hash::Hasher;
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Deck {
@@ -25,6 +25,7 @@ impl Deck {
         h.finish()
     }
 
+    #[allow(dead_code)]
     pub fn is_won(&self) -> bool {
         Pile::get(self.off).count() == 8
     }
@@ -202,7 +203,7 @@ impl Deck {
         }
     }
 
-    fn prune_moves(&self, moves: &Vec<Move>, play_refs: &Vec<Rc<Pile>>) -> Option<Move> {
+    fn prune_moves(&self, moves: &Vec<Move>, play_refs: &Vec<Arc<Pile>>) -> Option<Move> {
         for m in moves {
             if m.is_off() || m.is_talon() {
                 continue;
@@ -262,6 +263,14 @@ impl Deck {
             }
         }
         result
+    }
+
+    pub fn playable(&self) -> u32 {
+        let mut result: u32 = 0;
+        for i in 0..10 {
+            result += Pile::get(self.play[i]).playable();
+        }
+        result + 13 * (Pile::get(self.off).count() as u32)
     }
 
     pub fn apply_move(&self, m: &Move) -> Deck {
@@ -484,6 +493,7 @@ Deal4:
 Off: KS KS KS KS KH KH KH KH";
         let deck = Deck::parse(&text.to_string());
         assert_eq!(deck.chaos(), 0);
+        assert_eq!(deck.playable(), 104);
     }
 
     #[test]
@@ -506,5 +516,6 @@ Deal4:
 Off: KS KS KS KS KH KH KH";
         let deck = Deck::parse(&text.to_string());
         assert_eq!(deck.chaos(), 16);
+        assert_eq!(deck.playable(), 104);
     }
 }
