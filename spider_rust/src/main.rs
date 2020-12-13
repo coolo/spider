@@ -114,7 +114,7 @@ fn main() {
     let filename = std::env::args().nth(1).expect("no filename given");
     let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
     let deck = Deck::parse(&contents);
-    let mut path: BTreeSet<u64> = BTreeSet::new();
+    //let mut path: BTreeSet<u64> = BTreeSet::new();
 
     println!("{}", deck.shortest_path(50000000).expect("win"));
 }

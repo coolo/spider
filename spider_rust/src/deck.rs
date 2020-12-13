@@ -326,6 +326,85 @@ impl Deck {
         newdeck
     }
 
+    fn pick_one_for_shortest_path(
+        deck: Deck,
+        visited: &mut BTreeSet<u64>,
+        depth: i32,
+        unvisted: &mut Vec<Deck>,
+        new_unvisited: &mut Vec<Deck>,
+        new_unvisited_tosort: &mut Vec<WeightedMove>,
+    ) -> Option<i32> {
+        let output = visited.len() % 100000 == 0;
+        let output = false;
+        if output {
+            println!("{} {} {}", deck.to_string(), deck.playable(), deck.chaos());
+
+            println!(
+                "{} Visited: {} unvisited: {}",
+                depth,
+                visited.len(),
+                unvisted.len(),
+            );
+        }
+
+        let moves = deck.get_moves(false);
+        let mut candidates = BinaryHeap::new();
+        let playable = deck.playable();
+        let chaos = deck.chaos();
+        // we have one sorted and one unsorted to avoid the sorting
+        // copying decks
+        let mut newdecks = vec![];
+        let n_workers = 2;
+        //let pool = ThreadPool::new(n_workers);
+        for m in &moves {
+            if output {
+                deck.explain_move(m);
+            }
+            let newdeck = deck.apply_move(m);
+            let hash = newdeck.hash(0);
+            if newdeck.is_won() {
+                println!("WON! {} {}", depth + 1, visited.len());
+                return Some(depth + 1);
+            }
+            newdecks.push(newdeck);
+
+            let newplayable = newdeck.playable();
+            let newchaos = newdeck.chaos();
+            if output {
+                println!(
+                    "PLAY {} -> {} CHAOS {} -> {}",
+                    playable, newplayable, chaos, newchaos
+                );
+            }
+            candidates.push(WeightedMove {
+                chaos: newchaos,
+                playable: newplayable,
+                hash: hash,
+                deck: newdecks.len() - 1,
+            });
+        }
+        let mut onegood = false;
+
+        for candidate in candidates {
+            if candidate.chaos < chaos || candidate.playable > playable {
+                onegood = true;
+            } else if onegood {
+                break;
+            }
+            if !visited.contains(&candidate.hash) {
+                if output {
+                    println!("Candidate {} {}", candidate.chaos, candidate.playable);
+                }
+                visited.insert(candidate.hash);
+                new_unvisited.push(newdecks[candidate.deck]);
+                let mut nc = candidate;
+                nc.deck = new_unvisited.len() - 1;
+                new_unvisited_tosort.push(nc);
+            }
+        }
+        None
+    }
+
     pub fn shortest_path(&self, limit: usize) -> Option<i32> {
         let mut unvisted: Vec<Deck> = Vec::new();
         unvisted.push(*self);
@@ -336,7 +415,7 @@ impl Deck {
         let mut visited = BTreeSet::new();
         visited.insert(self.hash(0));
 
-        let mut depth = 0;
+        let mut depth: i32 = 0;
 
         loop {
             if visited.len() > limit {
@@ -374,71 +453,16 @@ impl Deck {
                     }
                 }
                 Some(deck) => {
-                    let output = visited.len() % 100000 == 0;
-                    let output = false;
-                    if output {
-                        println!("{} {} {}", deck.to_string(), deck.playable(), deck.chaos());
-
-                        println!(
-                            "{} Visited: {} unvisited: {}",
-                            depth,
-                            visited.len(),
-                            unvisted.len(),
-                        );
-                    }
-
-                    let moves = deck.get_moves(false);
-                    let mut candidates = BinaryHeap::new();
-                    let playable = deck.playable();
-                    let chaos = deck.chaos();
-                    // we have one sorted and one unsorted to avoid the sorting
-                    // copying decks
-                    let mut newdecks = vec![];
-                    for m in &moves {
-                        if output {
-                            deck.explain_move(m);
-                        }
-                        let newdeck = deck.apply_move(m);
-                        let hash = newdeck.hash(0);
-                        if newdeck.is_won() {
-                            println!("WON! {} {}", depth + 1, visited.len());
-                            return Some(depth + 1);
-                        }
-                        newdecks.push(newdeck);
-
-                        let newplayable = newdeck.playable();
-                        let newchaos = newdeck.chaos();
-                        if output {
-                            println!(
-                                "PLAY {} -> {} CHAOS {} -> {}",
-                                playable, newplayable, chaos, newchaos
-                            );
-                        }
-                        candidates.push(WeightedMove {
-                            chaos: newchaos,
-                            playable: newplayable,
-                            hash: hash,
-                            deck: newdecks.len() - 1,
-                        });
-                    }
-                    let mut onegood = false;
-
-                    for candidate in candidates {
-                        if candidate.chaos < chaos || candidate.playable > playable {
-                            onegood = true;
-                        } else if onegood {
-                            break;
-                        }
-                        if !visited.contains(&candidate.hash) {
-                            if output {
-                                println!("Candidate {} {}", candidate.chaos, candidate.playable);
-                            }
-                            visited.insert(candidate.hash);
-                            new_unvisited.push(newdecks[candidate.deck]);
-                            let mut nc = candidate;
-                            nc.deck = new_unvisited.len() - 1;
-                            new_unvisited_tosort.push(nc);
-                        }
+                    let ret = Deck::pick_one_for_shortest_path(
+                        deck,
+                        &mut visited,
+                        depth,
+                        &mut unvisted,
+                        &mut new_unvisited,
+                        &mut new_unvisited_tosort,
+                    );
+                    if ret.is_some() {
+                        return ret;
                     }
                 }
             }
@@ -737,7 +761,7 @@ Off: KS KS KS KS KH KH KH";
         Off: KS KH KH KS KH KS";
         let deck = Deck::parse(&text.to_string());
         // win in 17 moves
-        let res = deck.shortest_path(50000);
+        let res = deck.shortest_path(80000);
         assert_eq!(res.expect("winnable"), 17);
     }
 
