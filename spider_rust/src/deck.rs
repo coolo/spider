@@ -291,7 +291,7 @@ impl Deck {
         }
         for i in 0..5 {
             if !Pile::get(self.talon[i]).is_empty() {
-                result += 40;
+                result += 4;
             }
         }
         result
@@ -305,7 +305,7 @@ impl Deck {
         result + 13 * (Pile::get(self.off).count() as u32)
     }
 
-    pub fn apply_move(&self, m: &Move) -> Deck {
+    pub fn apply_move(&self, m: &Move, stop: bool) -> Deck {
         let mut newdeck = self.clone();
         newdeck.moves.push(*m);
 
@@ -330,6 +330,24 @@ impl Deck {
         }
         newdeck.play[m.to()] = Pile::copy_from(self.play[m.to()], self.play[m.from()], m.index());
         newdeck.play[m.from()] = Pile::remove_cards(self.play[m.from()], m.index());
+        if stop
+            && m.index() > 0
+            && Pile::get(self.play[m.from()])
+                .at(m.index() - 1)
+                .is_unknown()
+        {
+            println!("What's up?");
+            /*std::string line;
+            std::getline(std::cin, line);
+            Card c(QString::fromStdString(line));
+            newone->piles[m.from] = newone->piles[m.from]->replaceAt(m.index - 1, c);
+            QFile file("tmp");
+            file.open(QIODevice::WriteOnly);
+            file.write(newone->toString().toUtf8());
+            file.close();*/
+            std::process::exit(1);
+        }
+
         newdeck
     }
 
@@ -356,7 +374,7 @@ impl Deck {
             if output {
                 deck.explain_move(m);
             }
-            let newdeck = deck.apply_move(m);
+            let newdeck = deck.apply_move(m, false);
             let hash = newdeck.hash(0);
             newdecks.push(newdeck.clone());
 
@@ -512,7 +530,7 @@ impl Deck {
                                         }
                                         print!("Move {}: ", mc);
                                         orig.explain_move(&m);
-                                        orig = orig.apply_move(&m);
+                                        orig = orig.apply_move(&m, true);
                                     }
                                 }
                             }
