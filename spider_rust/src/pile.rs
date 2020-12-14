@@ -123,6 +123,14 @@ impl Pile {
         Pile::or_insert(&newcards, newcount)
     }
 
+    pub fn replace_at(pile: u32, index: usize, c: &Card) -> u32 {
+        // shadow
+        let pile = Pile::get(pile);
+        let mut newcards = pile.cards.clone();
+        newcards[index] = c.value();
+        Pile::or_insert(&newcards, pile.count())
+    }
+
     pub fn add_card(pile: u32, card: Card) -> u32 {
         let pile = Pile::get(pile);
         let mut newcards = pile.cards.clone();

@@ -3,6 +3,8 @@ use crate::moves::Move;
 use crate::pile::Pile;
 use fasthash::{farm::Hasher64, FastHasher};
 use parking_lot::RwLock;
+use rand::seq::SliceRandom;
+use rand::thread_rng;
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::collections::BinaryHeap;
@@ -102,6 +104,10 @@ impl Deck {
         }
         assert_eq!(index, 16);
         newdeck
+    }
+
+    pub fn win_moves(&self) -> &Vec<Move> {
+        &self.moves
     }
 
     pub fn to_string(&self) -> String {
@@ -291,7 +297,7 @@ impl Deck {
         }
         for i in 0..5 {
             if !Pile::get(self.talon[i]).is_empty() {
-                result += 4;
+                result += 40;
             }
         }
         result
@@ -305,7 +311,7 @@ impl Deck {
         result + 13 * (Pile::get(self.off).count() as u32)
     }
 
-    pub fn apply_move(&self, m: &Move, stop: bool) -> Deck {
+    pub fn apply_move(&self, m: &Move) -> Deck {
         let mut newdeck = self.clone();
         newdeck.moves.push(*m);
 
@@ -330,24 +336,6 @@ impl Deck {
         }
         newdeck.play[m.to()] = Pile::copy_from(self.play[m.to()], self.play[m.from()], m.index());
         newdeck.play[m.from()] = Pile::remove_cards(self.play[m.from()], m.index());
-        if stop
-            && m.index() > 0
-            && Pile::get(self.play[m.from()])
-                .at(m.index() - 1)
-                .is_unknown()
-        {
-            println!("What's up?");
-            /*std::string line;
-            std::getline(std::cin, line);
-            Card c(QString::fromStdString(line));
-            newone->piles[m.from] = newone->piles[m.from]->replaceAt(m.index - 1, c);
-            QFile file("tmp");
-            file.open(QIODevice::WriteOnly);
-            file.write(newone->toString().toUtf8());
-            file.close();*/
-            std::process::exit(1);
-        }
-
         newdeck
     }
 
@@ -374,7 +362,7 @@ impl Deck {
             if output {
                 deck.explain_move(m);
             }
-            let newdeck = deck.apply_move(m, false);
+            let newdeck = deck.apply_move(m);
             let hash = newdeck.hash(0);
             newdecks.push(newdeck.clone());
 
@@ -461,8 +449,9 @@ impl Deck {
                 cards.remove(index);
             }
         }
+        let mut rng = thread_rng();
+        cards.shuffle(&mut rng);
         println!("Cards {}", Card::vec_as_string(&cards));
-        // do not shuffle for now
         for i in 0..10 {
             self.play[i] = Pile::get(self.play[i]).pick_unknown(&mut cards);
         }
@@ -472,7 +461,7 @@ impl Deck {
         assert_eq!(cards.len(), 0);
     }
 
-    pub fn shortest_path(&self, cap: usize, limit: usize) -> Option<i32> {
+    pub fn shortest_path(&mut self, cap: usize, limit: usize) -> Option<i32> {
         let mut unvisted: Vec<Deck> = Vec::new();
         unvisted.push(self.clone());
         // just append
@@ -522,21 +511,13 @@ impl Deck {
                             None => break,
                             Some(val) => {
                                 if result == val.hash(0) {
-                                    let mut mc = 0;
-                                    let mut orig = self.clone();
-                                    for m in &val.moves {
-                                        if !m.is_off() {
-                                            mc += 1;
-                                        }
-                                        print!("Move {}: ", mc);
-                                        orig.explain_move(&m);
-                                        orig = orig.apply_move(&m, true);
-                                    }
+                                    self.moves = val.moves.clone();
+                                    return Some(depth + 1);
                                 }
                             }
                         }
                     }
-                    return Some(depth + 1);
+                    assert!(false);
                 }
             }
 
@@ -576,6 +557,18 @@ impl Deck {
         }
 
         Some(-1 * depth)
+    }
+
+    pub fn top_card_unknown(&self, index: usize) -> bool {
+        let pile = Pile::get(self.play[index]);
+        if pile.count() == 0 {
+            return false;
+        }
+        pile.at(pile.count() - 1).is_unknown()
+    }
+
+    pub fn replace_play_card(&mut self, play: usize, index: usize, c: &Card) {
+        self.play[play] = Pile::replace_at(self.play[play], index, c);
     }
 }
 
@@ -815,7 +808,7 @@ Off: KS KS KS KS KH KH KH";
         Deal3: 
         Deal4: 
         Off: KS KS KS KS KH KH KH";
-        let deck = Deck::parse(&text.to_string());
+        let mut deck = Deck::parse(&text.to_string());
         assert_eq!(deck.shortest_path(3400, 100).expect("winnable"), 3);
     }
 
@@ -841,7 +834,7 @@ Off: KS KS KS KS KH KH KH";
         Deal3: 
         Deal4: 
         Off: KS KH KH KS KS";
-        let deck = Deck::parse(&text.to_string());
+        let mut deck = Deck::parse(&text.to_string());
         let res = deck.shortest_path(3400, 5000);
         //assert_eq!(res.expect("winnable"), 28);
         assert!(res.is_none()); // requires a little more capacity
@@ -866,7 +859,7 @@ Off: KS KS KS KS KH KH KH";
         Deal3:
         Deal4:
         Off: KS KH KH KS KH KS";
-        let deck = Deck::parse(&text.to_string());
+        let mut deck = Deck::parse(&text.to_string());
         // win in 17 moves
         let res = deck.shortest_path(3400, 80000);
         assert_eq!(res.expect("winnable"), 17);
@@ -890,9 +883,32 @@ Off: KS KS KS KS KH KH KH";
         Deal3: 
         Deal4: 
         Off: KS";
-        let deck = Deck::parse(&text.to_string());
+        let mut deck = Deck::parse(&text.to_string());
         // win in 17 moves
         let res = deck.shortest_path(3400, 50000);
         assert_eq!(res.expect("out of options"), -8);
+    }
+
+    #[test]
+    fn top_card_unknown() {
+        let text = "Play0: JS TS 9S 8S 7S 6S 5S 4S AS TH 9H 8H 7H 6H 5H 4H 3H 2H AH
+        Play1: KH QH JH 8H 6H 5H 4H 8H 2S AS
+        Play2: JH TS 9S 8S
+        Play3: KH TH 3S 2S KH QH
+        Play4: |8H |AH 7S 6S 5S 4S 3H 7H 6H 5H 4H KS QS 6H 5S 4S
+        Play5: 7H 7S TH XX
+        Play6: |JH AH JS 9H KS QS 5H 8S
+        Play7: |7H |9S 6S JH KH 2H 3H 2H
+        Play8: TH 9H QS QH KS QH
+        Play9: 3S 2S AS JS 4H 3H 2H AH 3S TS
+        Deal0: 
+        Deal1: 
+        Deal2: 
+        Deal3: 
+        Deal4: 
+        Off: KS";
+        let deck = Deck::parse(&text.to_string());
+        assert_eq!(deck.top_card_unknown(5), true);
+        assert_eq!(deck.top_card_unknown(4), false);
     }
 }
