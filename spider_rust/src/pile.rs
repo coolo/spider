@@ -217,6 +217,35 @@ impl Pile {
         }
         (self.count - index - 1) as u32
     }
+
+    pub fn remove_known(&self, cards: &mut Vec<Card>) {
+        for i in 0..self.count {
+            let c = self.at(i);
+            if c.is_unknown() {
+                continue;
+            }
+            let index = cards
+                .iter()
+                .position(|x| x.is_same_card(&c))
+                .expect("card is in");
+            cards.remove(index);
+        }
+    }
+
+    pub fn pick_unknown(&self, cards: &mut Vec<Card>) -> u32 {
+        let mut newcards = self.cards.clone();
+        for i in 0..self.count {
+            let c = self.at(i);
+            if !c.is_unknown() {
+                continue;
+            }
+            let mut firstpick = cards.pop().expect("Enough cards");
+            firstpick.set_faceup(false);
+            firstpick.set_unknown(true);
+            newcards[i] = firstpick.value();
+        }
+        Pile::or_insert(&newcards, self.count)
+    }
 }
 
 #[cfg(test)]

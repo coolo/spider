@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(PartialEq, Debug)]
 pub struct Card {
     // 4 bits rank
@@ -21,10 +23,10 @@ impl Card {
             self.value = self.value & !(1 << 6)
         }
     }
-    pub fn unknown(&self) -> bool {
+    pub fn is_unknown(&self) -> bool {
         self.value & (1 << 7) > 0
     }
-    fn set_unknown(&mut self, unknown: bool) {
+    pub fn set_unknown(&mut self, unknown: bool) {
         if unknown {
             self.value = self.value | (1 << 7)
         } else {
@@ -49,6 +51,16 @@ impl Card {
     pub fn new(value: u8) -> Card {
         Card { value: value }
     }
+
+    pub fn known(suit: u8, rank: u8) -> Card {
+        let mut card = Card::new(0);
+        card.set_unknown(false);
+        card.set_faceup(true);
+        card.set_rank(rank);
+        card.set_suit(suit);
+        card
+    }
+
     pub fn parse(token: &str) -> Option<Card> {
         let mut card = Card::new(0);
         let mut chars = token.chars();
@@ -106,9 +118,10 @@ impl Card {
         }
         Some(card)
     }
+
     pub fn to_string(&self) -> String {
         let mut result;
-        if self.unknown() {
+        if self.is_unknown() {
             result = String::from("XX");
         } else {
             result = match self.rank() {
@@ -141,6 +154,31 @@ impl Card {
         }
         return result;
     }
+
+    pub fn vec_as_string(cards: &Vec<Card>) -> String {
+        let mut res: String = String::from("[");
+        let mut first = true;
+        for c in cards {
+            if first {
+                first = false;
+            } else {
+                res.push_str(", ");
+            }
+            res.push_str(&c.to_string());
+        }
+        res + "]"
+    }
+
+    pub fn is_same_card(&self, other: &Card) -> bool {
+        // we could also compare the bitmasked value, but this is easier to read
+        self.rank() == other.rank() && self.suit() == other.suit()
+    }
+}
+
+impl fmt::Display for Card {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_string())
+    }
 }
 
 #[cfg(test)]
@@ -167,15 +205,15 @@ mod cardtests {
     #[test]
     fn unknown() {
         let mut unknown = Card { value: 41 };
-        assert!(!unknown.unknown());
+        assert!(!unknown.is_unknown());
         unknown.set_unknown(true);
         assert_eq!(unknown.value, 169);
         // stays
         assert_eq!(unknown.rank(), 9);
         assert_eq!(unknown.suit(), 2);
-        assert!(unknown.unknown());
+        assert!(unknown.is_unknown());
         unknown.set_unknown(false);
-        assert!(!unknown.unknown());
+        assert!(!unknown.is_unknown());
         assert_eq!(unknown.value, 41);
     }
 
@@ -232,5 +270,11 @@ mod cardtests {
         for card in cards.into_iter() {
             assert_eq!(Card::parse(card).unwrap().to_string(), card);
         }
+    }
+
+    #[test]
+    fn test_format() {
+        let card = Card::parse("|AH").unwrap();
+        assert_eq!(format!("Test card: {}", card), "Test card: |AH");
     }
 }

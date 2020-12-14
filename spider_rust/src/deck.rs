@@ -1,3 +1,4 @@
+use crate::card::Card;
 use crate::moves::Move;
 use crate::pile::Pile;
 use fasthash::{farm::Hasher64, FastHasher};
@@ -401,6 +402,56 @@ impl Deck {
             }
         }
         None
+    }
+
+    pub fn full_deck(n_suits: usize) -> Vec<Card> {
+        let mut cards = vec![];
+        for suit in 0..4 {
+            for rank in 1..=13 {
+                let mut nsuit = suit;
+                if n_suits == 1 {
+                    nsuit = 0;
+                }
+                if n_suits == 2 {
+                    nsuit = suit % 2;
+                }
+                let c = Card::known(nsuit, rank);
+                cards.push(Card::new(c.value()));
+                cards.push(c);
+            }
+        }
+        cards
+    }
+
+    pub fn shuffle_unknowns(&mut self, n_suits: usize) {
+        let mut cards = Deck::full_deck(n_suits);
+        for i in 0..10 {
+            Pile::get(self.play[i]).remove_known(&mut cards);
+        }
+        for i in 0..5 {
+            Pile::get(self.talon[i]).remove_known(&mut cards);
+        }
+        let off = Pile::get(self.off);
+        for i in 0..off.count() {
+            let suit = off.at(i).suit();
+            for rank in 1..=13 {
+                let c = Card::known(suit, rank);
+                let index = cards
+                    .iter()
+                    .position(|x| x.is_same_card(&c))
+                    .expect("card is in");
+                cards.remove(index);
+            }
+        }
+        println!("Cards {}", Card::vec_as_string(&cards));
+        // do not shuffle for now
+        for i in 0..10 {
+            self.play[i] = Pile::get(self.play[i]).pick_unknown(&mut cards);
+        }
+        for i in 0..5 {
+            self.talon[i] = Pile::get(self.talon[i]).pick_unknown(&mut cards);
+        }
+        assert_eq!(cards.len(), 0);
     }
 
     pub fn shortest_path(&self, cap: usize, limit: usize) -> Option<i32> {
