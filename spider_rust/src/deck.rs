@@ -568,7 +568,9 @@ impl Deck {
     }
 
     pub fn replace_play_card(&mut self, play: usize, index: usize, c: &Card) {
-        self.play[play] = Pile::replace_at(self.play[play], index, c);
+        let mut c = Card::new(c.value());
+        c.set_faceup(Pile::get(self.play[play]).at(index).faceup());
+        self.play[play] = Pile::replace_at(self.play[play], index, &c);
     }
 }
 

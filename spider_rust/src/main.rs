@@ -4,15 +4,37 @@ mod deck;
 mod moves;
 mod pile;
 use card::Card;
+use clap::{App, Arg};
 use deck::Deck;
 use std::fs::File;
 use std::io;
 use std::io::Write;
 
 fn main() {
-    let filename = std::env::args().nth(1).expect("no filename given");
+    let matches = App::new("spider")
+        .version("1.0")
+        .arg(
+            Arg::with_name("orig")
+                .long("orig")
+                .takes_value(true)
+                .help("Original file name"),
+        )
+        .arg(
+            Arg::with_name("filename")
+                .takes_value(true)
+                .help("Temporary file name"),
+        )
+        .arg(
+            Arg::with_name("cap")
+                .long("cap")
+                .takes_value(true)
+                .help("Runtime cap"),
+        )
+        .get_matches();
+
+    let filename = matches.value_of("filename").expect("filename");
     let mut cap: usize = 5000;
-    if let Some(ncap) = std::env::args().nth(2) {
+    if let Some(ncap) = matches.value_of("cap") {
         cap = ncap.parse().expect("Integer");
     }
     let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
@@ -44,9 +66,7 @@ fn main() {
             let c = Card::parse(&buffer.trim()).expect("valid card");
 
             orig.replace_play_card(m.from(), m.index() - 1, &c);
-            println!("{}", orig.to_string());
 
-            // Open a file in write-only mode, returns `io::Result<File>`
             let mut file = match File::create("tmp") {
                 Err(why) => panic!("couldn't create tmp: {}", why),
                 Ok(file) => file,
@@ -56,6 +76,23 @@ fn main() {
                 Err(why) => panic!("couldn't write to tmp {}", why),
                 Ok(_) => println!("successfully wrote to tmp"),
             }
+
+            let filename = matches.value_of("orig").expect("filename");
+            let contents =
+                fs::read_to_string(filename).expect("Something went wrong reading the file");
+            let mut deck2 = Deck::parse(&contents);
+            deck2.replace_play_card(m.from(), m.index() - 1, &c);
+            println!("HALLO\n{}", deck2.to_string());
+            let mut file = match File::create(filename) {
+                Err(why) => panic!("couldn't create tmp: {}", why),
+                Ok(file) => file,
+            };
+
+            match file.write_all(deck2.to_string().as_bytes()) {
+                Err(why) => panic!("couldn't write to tmp {}", why),
+                Ok(_) => println!("successfully wrote to tmp"),
+            }
+
             std::process::exit(1);
         }
     }
