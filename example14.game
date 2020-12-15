@@ -1,0 +1,17 @@
+# 22.12. limited
+Play0: |5S |9S |5H |KH |2S QH
+Play1: |QH |AH |8S |QS |QS 6S
+Play2: |4S |AS |4H |TH |9H JS
+Play3: |4H |TS |2S |4H |TH 3S
+Play4: |5S |AH |2S |3S 9S
+Play5: |8H |6H |6S |JS 9H
+Play6: |JH |TS |AS |7H 9S
+Play7: |4H |7H |3H |2S 3S
+Play8: |JH |JH |8H |QH JH
+Play9: |KS |8S |AH |7S 5S
+Deal0: 9H TH 6H 2H TS 4S 3S 5H 6H KH
+Deal1: KS 4S 2H KS AH 5S TH JS 7S AS
+Deal2: 3H 9S QS 6H 8S 2H AS 7S JS 5H
+Deal3: QH QS KH 7H 3H TS 8H KS 5H 7S
+Deal4: 7H 2H 9H 3H 8H 8S 6S 6S KH 4S
+Off: 
