@@ -1,0 +1,17 @@
+# 16.12 - 1 colour
+Play0: |8S |KS |7S |5S |8S QS
+Play1: |2S |6S |9S |5S |2S KS
+Play2: |JS |JS |KS |3S |3S 8S
+Play3: |KS |KS |7S |4S |3S 9S
+Play4: |AS |4S |6S |QS 3S
+Play5: |TS |KS |TS |JS 7S
+Play6: |JS |6S |4S |5S AS
+Play7: |QS |KS |AS |8S 9S
+Play8: |2S |9S |4S |4S 2S
+Play9: |8S |KS |3S |5S TS
+Deal0: 9S 2S 6S AS TS 7S JS 7S TS 8S
+Deal1: 8S 5S 7S QS TS QS AS 3S 5S QS
+Deal2: 9S 9S JS 4S 6S TS 9S 5S AS 5S
+Deal3: AS 4S 4S 2S 3S 2S 7S 6S 8S QS
+Deal4: QS 6S JS 7S 2S AS 3S JS TS 6S
+Off: 
