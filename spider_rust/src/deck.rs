@@ -11,12 +11,15 @@ use std::mem::MaybeUninit;
 use std::ptr;
 use std::sync::Arc;
 
+const MAX_MOVES: usize = 200;
+
 #[derive(Debug, Clone)]
 pub struct Deck {
     play: [u32; 10],
     talon: [u32; 5],
     off: u32,
-    moves: Vec<Move>,
+    moves: [Move; MAX_MOVES],
+    moves_index: usize,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -69,8 +72,10 @@ impl Deck {
             play: [0; 10],
             talon: [0; 5],
             off: 0,
-            moves: vec![],
+            moves_index: 0,
+            moves: [Move::invalid(); MAX_MOVES],
         };
+        // that should be enough :)
         let mut index = 0;
         for line in contents.lines() {
             if line.starts_with("#") {
@@ -106,8 +111,12 @@ impl Deck {
         newdeck
     }
 
-    pub fn win_moves(&self) -> &Vec<Move> {
-        &self.moves
+    pub fn win_moves(&self) -> Vec<Move> {
+        //Vec::new(self.moves)
+        let mut ret = vec![];
+        ret.extend(self.moves.iter());
+        ret.truncate(self.moves_index);
+        ret
     }
 
     pub fn to_string(&self) -> String {
@@ -325,7 +334,11 @@ impl Deck {
 
     pub fn apply_move(&self, m: &Move) -> Deck {
         let mut newdeck = self.clone();
-        newdeck.moves.push(*m);
+        newdeck.moves[newdeck.moves_index] = *m;
+        newdeck.moves_index += 1;
+        if newdeck.moves_index >= MAX_MOVES {
+            panic!("Way too deep");
+        }
 
         if m.is_talon() {
             let from_pile = m.from();
