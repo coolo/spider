@@ -2,7 +2,6 @@ use crate::card::Card;
 use crate::moves::Move;
 use crate::pile::Pile;
 use fasthash::farm;
-use parking_lot::RwLock;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use std::cmp::Ordering;
@@ -10,9 +9,7 @@ use std::collections::BTreeSet;
 use std::collections::BinaryHeap;
 use std::mem::MaybeUninit;
 use std::ptr;
-use std::sync::mpsc::channel;
 use std::sync::Arc;
-use threadpool::Builder;
 
 #[derive(Debug, Clone)]
 pub struct Deck {
@@ -356,9 +353,9 @@ impl Deck {
 
     fn pick_one_for_shortest_path(
         deck: &Deck,
-        visited: &RwLock<BTreeSet<u64>>,
-        new_unvisited: &RwLock<Vec<Deck>>,
-        new_unvisited_tosort: &RwLock<Vec<WeightedMove>>,
+        visited: &mut BTreeSet<u64>,
+        new_unvisited: &mut Vec<Deck>,
+        new_unvisited_tosort: &mut Vec<WeightedMove>,
     ) -> Option<u64> {
         //let _output = visited.len() % 100000 == 0;
         let output = false;
@@ -404,21 +401,19 @@ impl Deck {
             } else if onegood {
                 break;
             }
-            if !visited.read().contains(&candidate.hash) {
+            if !visited.contains(&candidate.hash) {
                 if output {
                     println!("Candidate {} {}", candidate.chaos, candidate.playable);
                 }
                 {
-                    let mut visited_locked = visited.write();
-                    let mut new_unvisited_locked = new_unvisited.write();
-                    visited_locked.insert(candidate.hash);
-                    new_unvisited_locked.push(newdecks[candidate.deck].clone());
+                    visited.insert(candidate.hash);
+                    new_unvisited.push(newdecks[candidate.deck].clone());
                     if newdecks[candidate.deck].is_won() {
                         return Some(candidate.hash);
                     }
                     let mut nc = candidate;
-                    nc.deck = new_unvisited_locked.len() - 1;
-                    new_unvisited_tosort.write().push(nc);
+                    nc.deck = new_unvisited.len() - 1;
+                    new_unvisited_tosort.push(nc);
                 }
             }
         }
@@ -482,52 +477,33 @@ impl Deck {
         let mut unvisted: Vec<Deck> = Vec::new();
         unvisted.push(self.clone());
         // just append
-        let new_unvisited: Arc<RwLock<Vec<Deck>>> = Arc::new(RwLock::new(Vec::new()));
+        let mut new_unvisited: Vec<Deck> = Vec::new();
         // sort only the index
-        let new_unvisited_tosort: Arc<RwLock<Vec<WeightedMove>>> =
-            Arc::new(RwLock::new(Vec::new()));
-        let visited = Arc::new(RwLock::new(BTreeSet::new()));
-        visited.write().insert(self.hash(0));
+        let mut new_unvisited_tosort: Vec<WeightedMove> = Vec::new();
+        let mut visited = BTreeSet::new();
+        visited.insert(self.hash(0));
 
         let mut depth: i32 = 0;
-        // TODO need to find out where a 2nd thread kills it
-        let pool = Builder::new().num_threads(1).build();
 
         loop {
-            if visited.read().len() > limit {
+            if visited.len() > limit {
                 return None;
             }
-            let (tx, rx) = channel();
-            let mut n_jobs = 0;
             for deck in &unvisted {
-                let tx = tx.clone();
-                let mut visited_cloned = Arc::clone(&visited);
-                let mut new_unvisited_cloned = Arc::clone(&new_unvisited);
-                let mut new_unvisited_tosort_cloned = Arc::clone(&new_unvisited_tosort);
                 let deck = deck.clone();
-                pool.execute(move || {
-                    let ret = Deck::pick_one_for_shortest_path(
-                        &deck,
-                        &mut visited_cloned,
-                        &mut new_unvisited_cloned,
-                        &mut new_unvisited_tosort_cloned,
-                    );
-                    tx.send(ret).expect("sent");
-                });
-                n_jobs += 1;
-            }
-            for _ in 0..n_jobs {
-                // the order is not important, this is only about the number of jobs
-                if let Some(result) = rx.recv().expect("recv") {
-                    pool.join();
-                    println!("WON! {} {}", depth + 1, visited.read().len());
-                    let new_unvisited_locked = new_unvisited.read();
-                    let mut iter = new_unvisited_locked.iter();
+                if let Some(res) = Deck::pick_one_for_shortest_path(
+                    &deck,
+                    &mut visited,
+                    &mut new_unvisited,
+                    &mut new_unvisited_tosort,
+                ) {
+                    println!("WON! {} {}", depth + 1, visited.len());
+                    let mut iter = new_unvisited.iter();
                     loop {
                         match iter.next() {
                             None => break,
                             Some(val) => {
-                                if result == val.hash(0) {
+                                if res == val.hash(0) {
                                     self.moves = val.moves.clone();
                                     return Some(depth + 1);
                                 }
@@ -539,11 +515,10 @@ impl Deck {
             }
 
             unvisted.clear();
-            let mut new_unvisited_tosort_locked = new_unvisited_tosort.write();
-            new_unvisited_tosort_locked.sort_unstable();
-            new_unvisited_tosort_locked.reverse();
+            new_unvisited_tosort.sort_unstable();
+            new_unvisited_tosort.reverse();
 
-            let mut iterator = new_unvisited_tosort_locked.iter();
+            let mut iterator = new_unvisited_tosort.iter();
             let mut printed = false;
             for _ in 0..cap {
                 if let Some(wm) = iterator.next() {
@@ -551,21 +526,21 @@ impl Deck {
                         println!(
                             "{}/{} {} {}",
                             depth,
-                            new_unvisited.read().len(),
+                            new_unvisited.len(),
                             wm.chaos,
                             wm.playable
                         );
                         //println!("{}", new_unvisited[wm.deck].to_string());
                         printed = true;
                     }
-                    unvisted.push(new_unvisited.read()[wm.deck].clone());
+                    unvisted.push(new_unvisited[wm.deck].clone());
                 } else {
                     break;
                 }
             }
 
-            new_unvisited_tosort_locked.clear();
-            new_unvisited.write().clear();
+            new_unvisited_tosort.clear();
+            new_unvisited.clear();
 
             depth += 1;
             if unvisted.len() == 0 {
