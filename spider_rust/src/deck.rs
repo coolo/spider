@@ -470,7 +470,9 @@ impl Deck {
         for i in 0..5 {
             self.talon[i] = Pile::get(self.talon[i]).pick_unknown(&mut cards);
         }
-        assert_eq!(cards.len(), 0);
+        if cards.len() > 0 {
+            panic!("There are cards left: {}", Card::vec_as_string(&cards));
+        }
     }
 
     pub fn shortest_path(&mut self, cap: usize, limit: usize) -> Option<i32> {

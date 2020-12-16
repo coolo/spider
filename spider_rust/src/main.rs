@@ -30,6 +30,13 @@ fn main() {
                 .takes_value(true)
                 .help("Runtime cap"),
         )
+        .arg(
+            Arg::with_name("suits")
+                .long("suits")
+                .takes_value(true)
+                .default_value("2")
+                .help("Number of suits"),
+        )
         .get_matches();
 
     let filename = matches.value_of("filename").expect("filename");
@@ -39,7 +46,7 @@ fn main() {
     }
     let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
     let mut deck = Deck::parse(&contents);
-    deck.shuffle_unknowns(2);
+    deck.shuffle_unknowns(matches.value_of("suits").unwrap().parse().unwrap());
 
     let result = deck.shortest_path(cap, 50_000_000);
     if result.is_none() {

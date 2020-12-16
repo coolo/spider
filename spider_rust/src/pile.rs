@@ -232,11 +232,14 @@ impl Pile {
             if c.is_unknown() {
                 continue;
             }
-            let index = cards
-                .iter()
-                .position(|x| x.is_same_card(&c))
-                .expect("card is in");
-            cards.remove(index);
+            match cards.iter().position(|x| x.is_same_card(&c)) {
+                Some(index) => {
+                    cards.remove(index);
+                }
+                None => {
+                    panic!("The card {} is not in {}", c, Card::vec_as_string(cards));
+                }
+            }
         }
     }
 
