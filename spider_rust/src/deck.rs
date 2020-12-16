@@ -1,14 +1,15 @@
 use crate::card::Card;
 use crate::moves::Move;
 use crate::pile::Pile;
-use fasthash::{farm::Hasher64, FastHasher};
+use fasthash::farm;
 use parking_lot::RwLock;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::collections::BinaryHeap;
-use std::hash::Hasher;
+use std::mem::MaybeUninit;
+use std::ptr;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
 use threadpool::Builder;
@@ -47,16 +48,18 @@ impl PartialOrd for WeightedMove {
 
 impl Deck {
     pub fn hash(&self, seed: u32) -> u64 {
-        let mut h = Hasher64::new();
-        h.write_u32(seed);
-        for i in 0..10 {
-            h.write_u32(self.play[i]);
+        let plays = self.play.as_ptr() as *const u8;
+        let talons = self.talon.as_ptr() as *const u8;
+        unsafe {
+            let mut bytes: [u8; 68] = MaybeUninit::zeroed().assume_init();
+            ptr::copy_nonoverlapping(plays, bytes.as_mut_ptr(), 40);
+            ptr::copy_nonoverlapping(talons, bytes.as_mut_ptr().offset(40), 20);
+            let t = std::mem::transmute::<u32, [u8; 4]>(self.off);
+            ptr::copy_nonoverlapping(t.as_ptr(), bytes.as_mut_ptr().offset(60), 4);
+            let t = std::mem::transmute::<u32, [u8; 4]>(seed);
+            ptr::copy_nonoverlapping(t.as_ptr(), bytes.as_mut_ptr().offset(64), 4);
+            farm::hash64(bytes)
         }
-        for i in 0..5 {
-            h.write_u32(self.talon[i])
-        }
-        h.write_u32(self.off);
-        h.finish()
     }
 
     #[allow(dead_code)]
@@ -877,7 +880,7 @@ Off: KS KS KS KS KH KH KH";
         Off: KS KH KH KS KH KS";
         let mut deck = Deck::parse(&text.to_string());
         // win in 17 moves
-        let res = deck.shortest_path(3400, 80000);
+        let res = deck.shortest_path(5400, 80000);
         assert_eq!(res.expect("winnable"), 17);
     }
 

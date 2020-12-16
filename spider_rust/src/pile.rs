@@ -18,15 +18,12 @@ static ARRAY: Lazy<RwLock<Vec<Arc<Pile>>>> = Lazy::new(|| RwLock::new(vec![]));
 static MAP: Lazy<RwLock<HashMap<u64, u32>>> = Lazy::new(|| RwLock::new(HashMap::new()));
 
 impl PileManager {
-    fn hash(cards: &[u8; 104], count: usize) -> u64 {
-        for i in count..104 {
-            assert!(cards[i] == 0);
-        }
+    fn hash(cards: &[u8; 104]) -> u64 {
         farm::hash64(cards)
     }
 
     fn or_insert(cards: &[u8; 104], count: usize) -> u32 {
-        let hash = PileManager::hash(&cards, count);
+        let hash = PileManager::hash(&cards);
         {
             let rlock = MAP.read();
             if let Some(pile) = rlock.get(&hash) {
