@@ -175,15 +175,19 @@ impl Deck {
                     return vec;
                 }
 
-                if prune && index > 0 {
+                let mut broken_sequence = false;
+                if index > 0 {
                     let next_card = from_pile.at(index - 1);
                     if next_card.faceup()
                         && next_card.suit() == top_suit
                         && next_card.rank() == top_rank + 1
                     {
-                        //println!("Skip {} {}", current.to_string(), next_card.to_string());
-                        index -= 1;
-                        continue;
+                        broken_sequence = true;
+                        if prune {
+                            //println!("Skip {} {}", current.to_string(), next_card.to_string());
+                            index -= 1;
+                            continue;
+                        }
                     }
                 }
 
@@ -208,9 +212,17 @@ impl Deck {
                             continue;
                         }
                     } else {
-                        if index == 0 && next_talon.is_none() {
-                            // forbid moves between empty cells once the talons are gone
-                            continue;
+                        // while talons are there, optimisations are evil
+                        // but in end game we have more options
+                        if next_talon.is_none() {
+                            if index == 0 {
+                                // forbid moves between empty cells once the talons are gone
+                                continue;
+                            }
+                            // there is no plausible reason to split up sequences in end game
+                            if broken_sequence {
+                                continue;
+                            }
                         }
                         moved_to_empty = true;
                     }
@@ -219,7 +231,7 @@ impl Deck {
 
                 if index == 0 {
                     break;
-                };
+                }
                 index -= 1;
             }
         }
