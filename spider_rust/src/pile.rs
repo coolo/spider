@@ -3,7 +3,6 @@ use fasthash::farm;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use std::collections::HashMap;
-use std::sync::Arc;
 
 pub struct Pile {
     cards: [u8; 104],
@@ -13,7 +12,7 @@ pub struct Pile {
 }
 
 pub struct PileManager {
-    array: Vec<Arc<Pile>>,
+    array: Vec<Pile>,
     map: HashMap<u64, u32>,
     lock: RwLock<u8>,
 }
@@ -22,11 +21,13 @@ static mut PM: Lazy<PileManager> = Lazy::new(|| PileManager::new());
 
 impl PileManager {
     pub fn new() -> PileManager {
-        PileManager {
+        let mut ret = PileManager {
             array: vec![],
             map: HashMap::new(),
             lock: RwLock::new(1),
-        }
+        };
+        ret.array.reserve(50000);
+        ret
     }
 
     fn hash(cards: &[u8; 104]) -> u64 {
@@ -54,7 +55,7 @@ impl PileManager {
 
         unsafe {
             let _arr_lock = PM.lock.write();
-            PM.array.push(Arc::new(new));
+            PM.array.push(new);
             let index = (PM.array.len() - 1) as u32;
             PM.map.insert(hash, index);
             index
@@ -78,11 +79,10 @@ impl PartialEq for Pile {
 impl Eq for Pile {}
 
 impl Pile {
-    pub fn get(index: u32) -> Arc<Pile> {
-        unsafe {
-            let _pm_lock = PM.lock.read();
-            Arc::clone(&PM.array[index as usize])
-        }
+    pub fn get(index: u32) -> &'static Pile {
+        // this is safe because the array is fixed size and
+        // does not relocate in other threads
+        unsafe { &PM.array[index as usize] }
     }
 
     pub fn at(&self, index: usize) -> Card {

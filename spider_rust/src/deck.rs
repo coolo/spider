@@ -9,7 +9,6 @@ use std::collections::BTreeSet;
 use std::collections::BinaryHeap;
 use std::mem::MaybeUninit;
 use std::ptr;
-use std::sync::Arc;
 
 const MAX_MOVES: usize = 200;
 
@@ -247,41 +246,11 @@ impl Deck {
                 index -= 1;
             }
         }
-        if !prune {
-            if !one_is_empty && next_talon.is_some() {
-                vec.push(Move::from_talon(next_talon.unwrap()));
-            }
-            return vec;
-        }
-        match self.prune_moves(&mut vec, &play_refs) {
-            None => {
-                if !one_is_empty && next_talon.is_some() {
-                    vec.push(Move::from_talon(next_talon.unwrap()));
-                }
-                vec
-            }
-            Some(m) => {
-                vec.retain(|&x| x == m);
-                vec
-            }
-        }
-    }
 
-    fn prune_moves(&self, moves: &Vec<Move>, play_refs: &Vec<Arc<Pile>>) -> Option<Move> {
-        for m in moves {
-            assert!(!m.is_off() && !m.is_talon());
-            let to_pile = &play_refs[m.to()];
-            if to_pile.count() == 0 {
-                continue;
-            }
-            let from_suit = play_refs[m.from()].at(m.index()).suit();
-            let to_suit = to_pile.at(to_pile.count() - 1).suit();
-            if to_suit == from_suit {
-                let newm: Move = *m;
-                return Some(newm.clone());
-            }
+        if !one_is_empty && next_talon.is_some() {
+            vec.push(Move::from_talon(next_talon.unwrap()));
         }
-        None
+        return vec;
     }
 
     pub fn explain_move(&self, m: &Move) -> () {
