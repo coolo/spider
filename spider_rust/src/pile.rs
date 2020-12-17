@@ -12,21 +12,32 @@ pub struct Pile {
     playable: u32,
 }
 
-pub struct PileManager {}
+pub struct PileManager {
+    array: Vec<Arc<Pile>>,
+    map: HashMap<u64, u32>,
+    lock: RwLock<u8>,
+}
 
-static ARRAY: Lazy<RwLock<Vec<Arc<Pile>>>> = Lazy::new(|| RwLock::new(vec![]));
-static MAP: Lazy<RwLock<HashMap<u64, u32>>> = Lazy::new(|| RwLock::new(HashMap::new()));
+static mut PM: Lazy<PileManager> = Lazy::new(|| PileManager::new());
 
 impl PileManager {
+    pub fn new() -> PileManager {
+        PileManager {
+            array: vec![],
+            map: HashMap::new(),
+            lock: RwLock::new(1),
+        }
+    }
+
     fn hash(cards: &[u8; 104]) -> u64 {
         farm::hash64(cards)
     }
 
     fn or_insert(cards: &[u8; 104], count: usize) -> u32 {
         let hash = PileManager::hash(&cards);
-        {
-            let rlock = MAP.read();
-            if let Some(pile) = rlock.get(&hash) {
+        unsafe {
+            let _rlock = PM.lock.read();
+            if let Some(pile) = PM.map.get(&hash) {
                 return *pile;
             }
         }
@@ -41,11 +52,11 @@ impl PileManager {
         new.chaos = new.calculate_chaos();
         new.playable = new.calculate_playable();
 
-        {
-            let mut arr_lock = ARRAY.write();
-            arr_lock.push(Arc::new(new));
-            let index = (arr_lock.len() - 1) as u32;
-            MAP.write().insert(hash, index);
+        unsafe {
+            let _arr_lock = PM.lock.write();
+            PM.array.push(Arc::new(new));
+            let index = (PM.array.len() - 1) as u32;
+            PM.map.insert(hash, index);
             index
         }
     }
@@ -68,7 +79,10 @@ impl Eq for Pile {}
 
 impl Pile {
     pub fn get(index: u32) -> Arc<Pile> {
-        Arc::clone(&ARRAY.read()[index as usize])
+        unsafe {
+            let _pm_lock = PM.lock.read();
+            Arc::clone(&PM.array[index as usize])
+        }
     }
 
     pub fn at(&self, index: usize) -> Card {
