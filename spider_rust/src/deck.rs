@@ -67,6 +67,10 @@ impl Deck {
         Pile::get(self.off).count() == 8
     }
 
+    pub fn reset_moves(&mut self) {
+        self.moves_index = 0;
+    }
+
     pub fn parse(contents: &String) -> Deck {
         let mut newdeck = Deck {
             play: [0; 10],
@@ -112,7 +116,6 @@ impl Deck {
     }
 
     pub fn win_moves(&self) -> Vec<Move> {
-        //Vec::new(self.moves)
         let mut ret = vec![];
         ret.extend(self.moves.iter());
         ret.truncate(self.moves_index);
@@ -518,6 +521,7 @@ impl Deck {
                             Some(val) => {
                                 if res == val.hash(0) {
                                     self.moves = val.moves.clone();
+                                    self.moves_index = val.moves_index;
                                     return Some(depth + 1);
                                 }
                             }

@@ -52,10 +52,9 @@ fn main() {
     if result.is_none() {
         return;
     }
-    let result = result.unwrap();
-    println!("{}", result);
     let mut mc = 0;
     let mut orig = deck.clone();
+    orig.reset_moves();
     for m in deck.win_moves() {
         if !m.is_off() {
             mc += 1;
