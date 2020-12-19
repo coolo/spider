@@ -6,9 +6,9 @@ use rand::seq::SliceRandom;
 use rand::thread_rng;
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
-use std::collections::BinaryHeap;
 use std::mem::MaybeUninit;
 use std::ptr;
+use std::rc::Rc;
 
 const MAX_MOVES: usize = 200;
 
@@ -21,10 +21,11 @@ pub struct Deck {
     moves_index: usize,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Clone)]
 struct WeightedMove {
-    deck: usize,
+    deck: Rc<Deck>,
     chaos: u32,
+    talons: u32,
     playable: u32,
     hash: u64,
 }
@@ -37,6 +38,13 @@ impl Ord for WeightedMove {
             .then(self.playable.cmp(&other.playable))
     }
 }
+
+impl PartialEq for WeightedMove {
+    fn eq(&self, other: &Self) -> bool {
+        self.hash == other.hash
+    }
+}
+impl Eq for WeightedMove {}
 
 // `PartialOrd` needs to be implemented as well.
 impl PartialOrd for WeightedMove {
@@ -68,6 +76,16 @@ impl Deck {
 
     pub fn reset_moves(&mut self) {
         self.moves_index = 0;
+    }
+
+    pub fn talons_left(&self) -> u32 {
+        let mut ret = 0;
+        for i in 0..5 {
+            if self.talon[i] == 0 {
+                ret += 1
+            }
+        }
+        ret
     }
 
     pub fn parse(contents: &String) -> Deck {
@@ -343,11 +361,6 @@ impl Deck {
         for i in 0..10 {
             result += Pile::get(self.play[i]).chaos();
         }
-        for i in 0..5 {
-            if !Pile::get(self.talon[i]).is_empty() {
-                result += 15;
-            }
-        }
         result
     }
 
@@ -375,6 +388,7 @@ impl Deck {
                 newdeck.play[to] = Pile::add_card(self.play[to], c);
             }
             newdeck.talon[m.from()] = Pile::parse("").unwrap();
+            assert_eq!(newdeck.talon[m.from()], 0);
             return newdeck;
         }
 
@@ -391,73 +405,19 @@ impl Deck {
         newdeck
     }
 
-    fn pick_one_for_shortest_path(
-        deck: &Deck,
-        visited: &mut BTreeSet<u64>,
-        new_unvisited: &mut Vec<Deck>,
-        new_unvisited_tosort: &mut Vec<WeightedMove>,
-    ) -> Option<u64> {
-        //let _output = visited.len() % 100000 == 0;
-        let output = false;
-        if output {
-            println!("{} {} {}", deck.to_string(), deck.playable(), deck.chaos());
-        }
-
+    fn pick_one_for_shortest_path(deck: &Deck, new_unvisited: &mut Vec<WeightedMove>) {
         let moves = deck.get_moves();
-        let mut candidates = BinaryHeap::new();
-        let playable = deck.playable();
-        let chaos = deck.chaos();
-        // we have one sorted and one unsorted to avoid the sorting
-        // copying decks
-        let mut newdecks = vec![];
-        for m in &moves {
-            if output {
-                deck.explain_move(m);
-            }
-            let newdeck = deck.apply_move(m);
-            let hash = newdeck.hash(0);
-            newdecks.push(newdeck.clone());
 
-            let newplayable = newdeck.playable();
-            let newchaos = newdeck.chaos();
-            if output {
-                println!(
-                    "PLAY {} -> {} CHAOS {} -> {}",
-                    playable, newplayable, chaos, newchaos
-                );
-            }
-            candidates.push(WeightedMove {
-                chaos: newchaos,
-                playable: newplayable,
-                hash: hash,
-                deck: newdecks.len() - 1,
+        for m in &moves {
+            let newdeck = Rc::new(deck.apply_move(m));
+            new_unvisited.push(WeightedMove {
+                chaos: newdeck.chaos(),
+                playable: newdeck.playable(),
+                talons: newdeck.talons_left(),
+                hash: newdeck.hash(0),
+                deck: newdeck,
             });
         }
-        let mut onegood = false;
-
-        for candidate in candidates {
-            if candidate.chaos < chaos || candidate.playable > playable {
-                onegood = true;
-            } else if onegood {
-                break;
-            }
-            if !visited.contains(&candidate.hash) {
-                if output {
-                    println!("Candidate {} {}", candidate.chaos, candidate.playable);
-                }
-                {
-                    visited.insert(candidate.hash);
-                    new_unvisited.push(newdecks[candidate.deck].clone());
-                    if newdecks[candidate.deck].is_won() {
-                        return Some(candidate.hash);
-                    }
-                    let mut nc = candidate;
-                    nc.deck = new_unvisited.len() - 1;
-                    new_unvisited_tosort.push(nc);
-                }
-            }
-        }
-        None
     }
 
     pub fn full_deck(n_suits: usize) -> Vec<Card> {
@@ -514,12 +474,10 @@ impl Deck {
     }
 
     pub fn shortest_path(&mut self, cap: usize, limit: usize) -> Option<i32> {
-        let mut unvisted: Vec<Deck> = Vec::new();
-        unvisted.push(self.clone());
-        // just append
-        let mut new_unvisited: Vec<Deck> = Vec::new();
+        let mut unvisited: [Vec<Rc<Deck>>; 6] = Default::default();
+        unvisited[self.talons_left() as usize].push(Rc::new(self.clone()));
         // sort only the index
-        let mut new_unvisited_tosort: Vec<WeightedMove> = Vec::new();
+        let mut new_unvisited: Vec<WeightedMove> = Vec::new();
         let mut visited = BTreeSet::new();
         visited.insert(self.hash(0));
 
@@ -529,40 +487,32 @@ impl Deck {
             if visited.len() > limit {
                 return None;
             }
-            for deck in &unvisted {
-                let deck = deck.clone();
-                if let Some(res) = Deck::pick_one_for_shortest_path(
-                    &deck,
-                    &mut visited,
-                    &mut new_unvisited,
-                    &mut new_unvisited_tosort,
-                ) {
-                    println!("WON! {} {}", depth + 1, visited.len());
-                    let mut iter = new_unvisited.iter();
-                    loop {
-                        match iter.next() {
-                            None => break,
-                            Some(val) => {
-                                if res == val.hash(0) {
-                                    self.moves = val.moves.clone();
-                                    self.moves_index = val.moves_index;
-                                    return Some(depth + 1);
-                                }
-                            }
-                        }
-                    }
-                    assert!(false);
+            for i in 0..=5 {
+                for deck in &unvisited[i] {
+                    Deck::pick_one_for_shortest_path(&deck, &mut new_unvisited);
                 }
             }
+            for i in 0..=5 {
+                unvisited[i].clear();
+            }
+            if new_unvisited.len() == 0 {
+                break;
+            }
+            new_unvisited.sort_unstable();
+            new_unvisited.reverse();
 
-            unvisted.clear();
-            new_unvisited_tosort.sort_unstable();
-            new_unvisited_tosort.reverse();
-
-            let mut iterator = new_unvisited_tosort.iter();
+            let mut iterator = new_unvisited.iter();
             let mut printed = false;
-            for _ in 0..cap {
+            loop {
                 if let Some(wm) = iterator.next() {
+                    if !visited.insert(wm.hash) {
+                        continue;
+                    }
+                    if wm.chaos == 0 {
+                        self.moves = wm.deck.moves.clone();
+                        self.moves_index = wm.deck.moves_index;
+                        return Some(depth + 1);
+                    }
                     if !printed {
                         println!(
                             "{}/{} {} {}",
@@ -574,30 +524,15 @@ impl Deck {
                         //println!("{}", new_unvisited[wm.deck].to_string());
                         printed = true;
                     }
-                    unvisted.push(new_unvisited[wm.deck].clone());
-                } else {
-                    break;
-                }
-            }
-            let mut printed = false;
-            loop {
-                if let Some(wm) = iterator.next() {
-                    if !printed {
-                        println!("discarding {} {} {}", depth, wm.chaos, wm.playable);
-                        printed = true;
+                    if unvisited[wm.talons as usize].len() < cap {
+                        unvisited[wm.talons as usize].push(Rc::clone(&wm.deck));
                     }
                 } else {
                     break;
                 }
             }
-
-            new_unvisited_tosort.clear();
             new_unvisited.clear();
-
             depth += 1;
-            if unvisted.len() == 0 {
-                break;
-            }
         }
 
         Some(-1 * depth)
@@ -942,11 +877,14 @@ Off: KS KS KS KS KH KH KH";
         Off: KS KH KH KS KH KS";
         let mut deck = Deck::parse(&text.to_string());
         // win in 17 moves
-        let res = deck.shortest_path(1400, 80000);
+        let res = deck.shortest_path(4400, 800000);
         assert_eq!(res.expect("winnable"), 17);
         /*
         let win_moves = deck.win_moves();
+        let mut mc = 0;
         for m in win_moves {
+            mc += 1;
+            print!("{}: ", mc);
             deck.explain_move(&m);
             deck = deck.apply_move(&m);
             //println!("{} {}\n{}", deck.chaos(), deck.playable(), deck.to_string());
@@ -974,7 +912,7 @@ Off: KS KS KS KS KH KH KH";
         Off: KS";
         let mut deck = Deck::parse(&text.to_string());
         let res = deck.shortest_path(3400, 50000);
-        assert_eq!(res.expect("out of options"), -3);
+        assert_eq!(res.expect("out of options"), -2);
     }
 
     #[test]
