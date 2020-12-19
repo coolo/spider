@@ -135,7 +135,7 @@ impl Deck {
         result
     }
 
-    pub fn get_moves(&self, prune: bool) -> Vec<Move> {
+    pub fn get_moves(&self) -> Vec<Move> {
         let mut vec = Vec::new();
 
         let mut next_talon: Option<usize> = None;
@@ -188,16 +188,11 @@ impl Deck {
                     return vec;
                 }
 
-                let mut broken_sequence = false;
+                let mut broken_sequence = 0;
                 if index > 0 {
                     let next_card = from_pile.at(index - 1);
                     if current.is_in_sequence_to(&next_card) {
-                        broken_sequence = true;
-                        if prune {
-                            //println!("Skip {} {}", current.to_string(), next_card.to_string());
-                            index -= 1;
-                            continue;
-                        }
+                        broken_sequence = from_pile.count() - index;
                     }
                 }
 
@@ -215,6 +210,21 @@ impl Deck {
                         if top_card.rank() != top_rank + 1 {
                             continue;
                         }
+                        if broken_sequence > 0 {
+                            /*println!(
+                                "BS {}->{} {} {} {}",
+                                from,
+                                to,
+                                broken_sequence,
+                                to_pile.sequence_of(top_suit),
+                                from_pile.sequence_of(top_suit)
+                            );*/
+                            if to_pile.sequence_of(top_suit) + broken_sequence
+                                <= from_pile.sequence_of(top_suit)
+                            {
+                                continue;
+                            }
+                        }
                     } else if moved_to_empty {
                         // if there is a talon left to draw the empty cell
                         // we move to does matter. In the endgame not at all
@@ -230,7 +240,7 @@ impl Deck {
                                 continue;
                             }
                             // there is no plausible reason to split up sequences in end game
-                            if broken_sequence {
+                            if broken_sequence > 0 {
                                 continue;
                             }
                         }
@@ -393,7 +403,7 @@ impl Deck {
             println!("{} {} {}", deck.to_string(), deck.playable(), deck.chaos());
         }
 
-        let moves = deck.get_moves(false);
+        let moves = deck.get_moves();
         let mut candidates = BinaryHeap::new();
         let playable = deck.playable();
         let chaos = deck.chaos();
@@ -569,6 +579,17 @@ impl Deck {
                     break;
                 }
             }
+            let mut printed = false;
+            loop {
+                if let Some(wm) = iterator.next() {
+                    if !printed {
+                        println!("discarding {} {} {}", depth, wm.chaos, wm.playable);
+                        printed = true;
+                    }
+                } else {
+                    break;
+                }
+            }
 
             new_unvisited_tosort.clear();
             new_unvisited.clear();
@@ -642,14 +663,16 @@ Deal3:
 Deal4: 
 Off: KS KH";
         let deck = Deck::parse(&text.to_string());
-        let moves = deck.get_moves(true);
+        let moves = deck.get_moves();
         // pick 2H+AH to move to 3H
         assert_eq!(
             moves,
             [
                 Move::regular(0, 6, 7),
+                Move::regular(2, 6, 8),
                 Move::regular(2, 3, 7),
                 Move::regular(2, 7, 7),
+                Move::regular(4, 7, 16),
                 Move::regular(7, 5, 10)
             ]
         );
@@ -674,20 +697,49 @@ Deal3:
 Deal4: 
 Off: KS KH";
         let deck = Deck::parse(&text.to_string());
-        let moves = deck.get_moves(true);
+        let moves = deck.get_moves();
         for m in &moves {
             deck.explain_move(m);
         }
-        // pick 5H to move to 6H
+        // pick 5H to move to 6H (among other, prune is gone)
         assert_eq!(
             moves,
             [
                 Move::regular(0, 6, 7),
+                Move::regular(2, 6, 8),
                 Move::regular(2, 7, 7),
+                Move::regular(4, 7, 16),
                 Move::regular(4, 3, 13),
                 Move::regular(9, 3, 0)
             ]
         );
+    }
+
+    #[test]
+    fn dont_break_sequences() {
+        let text = "Play0: KS QS JS TS 9S 8S 7S 6S
+Play1: QS  
+Play2: |KS |2S |JS |KS |JH QH 2H AH TH
+Play3: |4H 3H 5H 6H
+Play4: |TH |3S |TS 9S 8S KH QH JH TS 9H 8H 7H 6S 5S 4S 3S 2S AS
+Play5: |7H |9H 8H 9S
+Play6: |7S |KH |AH |4H 2H 3H
+Play7: |JS |7S 6S 5H 4H 2S KH QS 6H 5S 4S 3S 8S AS
+Play8: 6S 5S 4S 3H 2H AH
+Play9: QH JH TH 9H 8H 7H 6H 5H
+Deal0: 
+Deal1: 
+Deal2: 
+Deal3: 
+Deal4: 
+Off: KS KH";
+        let deck = Deck::parse(&text.to_string());
+        let moves = deck.get_moves();
+        for m in &moves {
+            deck.explain_move(m);
+        }
+        // move 5S to 6S even as it splits a smaller sequence
+        assert_eq!(moves, [Move::regular(4, 0, 13), Move::regular(5, 2, 3),]);
     }
 
     #[test]
@@ -709,7 +761,7 @@ Off: KS KH";
         Deal4: 
         Off: KS KH KH KS";
         let deck = Deck::parse(&text.to_string());
-        let moves = deck.get_moves(true);
+        let moves = deck.get_moves();
         for m in &moves {
             deck.explain_move(&m);
             // all moves are to empty
@@ -739,7 +791,7 @@ Deal3:
 Deal4: 
 Off: KS KH KH KS";
         let deck = Deck::parse(&text.to_string());
-        let moves = deck.get_moves(true);
+        let moves = deck.get_moves();
         // pick 9S to move to TS to uncover the other TS
         assert!(moves.contains(&Move::regular(4, 9, 3)));
     }
@@ -753,7 +805,7 @@ Play3:
 Play4: |TH |3S |TS 9S 8S
 Play5: |9S |9H 8H 7H 6H 5S 4S 3S 2S AS
 Play6: |7S |QS |KH |4H 3H 2S QH JH KH QH JS TH 9H 8H 7H 6H 5H 4H 3H 2H AH
-Play7: |8S |JS |7S 6S 5S 4S
+Play7: |8S |JS |7S 6S 4S 5S
 Play8: 6S 5H
 Play9: TS JH KS
 Deal0: 
@@ -763,7 +815,7 @@ Deal3:
 Deal4: 
 Off: KS KH KH KS";
         let deck = Deck::parse(&text.to_string());
-        let moves = deck.get_moves(true);
+        let moves = deck.get_moves();
         for m in &moves {
             deck.explain_move(m);
             // all moves are to empty
@@ -890,7 +942,7 @@ Off: KS KS KS KS KH KH KH";
         Off: KS KH KH KS KH KS";
         let mut deck = Deck::parse(&text.to_string());
         // win in 17 moves
-        let res = deck.shortest_path(5400, 80000);
+        let res = deck.shortest_path(5400, 800000000);
         assert_eq!(res.expect("winnable"), 17);
     }
 
@@ -913,9 +965,8 @@ Off: KS KS KS KS KH KH KH";
         Deal4: 
         Off: KS";
         let mut deck = Deck::parse(&text.to_string());
-        // win in 17 moves
         let res = deck.shortest_path(3400, 50000);
-        assert_eq!(res.expect("out of options"), -8);
+        assert_eq!(res.expect("out of options"), -3);
     }
 
     #[test]
