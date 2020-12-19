@@ -15,7 +15,7 @@ fn play_one_round(filename: &str, cap: usize, suits: usize, orig_filename: Optio
     let mut deck = Deck::parse(&contents);
     deck.shuffle_unknowns(suits);
 
-    let result = deck.shortest_path(cap, 50_000_000);
+    let result = deck.shortest_path(cap, 80_000_000);
     if result.is_none() {
         return false;
     }

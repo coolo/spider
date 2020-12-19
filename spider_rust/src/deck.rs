@@ -89,6 +89,9 @@ impl Deck {
     }
 
     pub fn parse(contents: &String) -> Deck {
+        // first thing: make sure the empty pile is first
+        Pile::or_insert(&[0; 104], 0);
+
         let mut newdeck = Deck {
             play: [0; 10],
             talon: [0; 5],
@@ -505,7 +508,7 @@ impl Deck {
             let mut printed = false;
             loop {
                 if let Some(wm) = iterator.next() {
-                    if !visited.insert(wm.hash) {
+                    if visited.contains(&wm.hash) {
                         continue;
                     }
                     if wm.chaos == 0 {
@@ -525,6 +528,7 @@ impl Deck {
                         printed = true;
                     }
                     if unvisited[wm.talons as usize].len() < cap {
+                        visited.insert(wm.hash);
                         unvisited[wm.talons as usize].push(Rc::clone(&wm.deck));
                     }
                 } else {
@@ -877,7 +881,7 @@ Off: KS KS KS KS KH KH KH";
         Off: KS KH KH KS KH KS";
         let mut deck = Deck::parse(&text.to_string());
         // win in 17 moves
-        let res = deck.shortest_path(4400, 800000);
+        let res = deck.shortest_path(4400, 80000);
         assert_eq!(res.expect("winnable"), 17);
         /*
         let win_moves = deck.win_moves();
