@@ -345,7 +345,7 @@ impl Deck {
         }
         for i in 0..5 {
             if !Pile::get(self.talon[i]).is_empty() {
-                result += 40;
+                result += 15;
             }
         }
         result
@@ -942,8 +942,16 @@ Off: KS KS KS KS KH KH KH";
         Off: KS KH KH KS KH KS";
         let mut deck = Deck::parse(&text.to_string());
         // win in 17 moves
-        let res = deck.shortest_path(5400, 800000000);
+        let res = deck.shortest_path(1400, 80000);
         assert_eq!(res.expect("winnable"), 17);
+        /*
+        let win_moves = deck.win_moves();
+        for m in win_moves {
+            deck.explain_move(&m);
+            deck = deck.apply_move(&m);
+            //println!("{} {}\n{}", deck.chaos(), deck.playable(), deck.to_string());
+        }
+        assert!(false);*/
     }
 
     #[test]

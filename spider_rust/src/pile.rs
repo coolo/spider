@@ -183,7 +183,7 @@ impl Pile {
         for i in 0..self.count {
             let current = self.at(i);
             if !current.faceup() {
-                result += 10;
+                result += 3;
             } else {
                 // first in stack
                 if lastcard.value() == 0 {
@@ -193,10 +193,10 @@ impl Pile {
                         if lastcard.suit() == current.suit() {
                             result += 1;
                         } else {
-                            result += 5;
+                            result += 2;
                         }
                     } else {
-                        result += 3;
+                        result += 2;
                     }
                 }
             }
@@ -322,13 +322,13 @@ mod piletests {
     #[test]
     fn chaos() {
         let pile = Pile::parse("|AS |3S |AS |6S |3H 8S").expect("parsed");
-        assert_eq!(Pile::get(pile).chaos(), 53);
+        assert_eq!(Pile::get(pile).chaos(), 17);
         let pile = Pile::parse("|TS 7S 6S").expect("parsed");
-        assert_eq!(Pile::get(pile).chaos(), 14);
+        assert_eq!(Pile::get(pile).chaos(), 6);
         let pile = Pile::parse("8S 7S 6S").expect("parsed");
         assert_eq!(Pile::get(pile).chaos(), 4);
         let pile = Pile::parse("8S 7H 6S").expect("parsed");
-        assert_eq!(Pile::get(pile).chaos(), 12);
+        assert_eq!(Pile::get(pile).chaos(), 6);
     }
 
     #[test]
