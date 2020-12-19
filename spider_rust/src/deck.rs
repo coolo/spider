@@ -110,7 +110,9 @@ impl Deck {
             }
             index += 1;
         }
-        assert_eq!(index, 16);
+        if index != 16 {
+            panic!("Not all piles are parsed");
+        }
         newdeck
     }
 
@@ -189,10 +191,7 @@ impl Deck {
                 let mut broken_sequence = false;
                 if index > 0 {
                     let next_card = from_pile.at(index - 1);
-                    if next_card.faceup()
-                        && next_card.suit() == top_suit
-                        && next_card.rank() == top_rank + 1
-                    {
+                    if current.is_in_sequence_to(&next_card) {
                         broken_sequence = true;
                         if prune {
                             //println!("Skip {} {}", current.to_string(), next_card.to_string());
@@ -273,14 +272,60 @@ impl Deck {
         }
         let mut count = from_pile.count();
         count -= m.index();
-        println!(
-            "Move {} cards from {} to {} - {}->{}",
-            count,
-            m.from() + 1,
-            m.to() + 1,
-            from_card,
-            to_card
-        );
+        if self.result_of_tap(m.from()) == Some(*m) {
+            println!("Tap on {} ({}->{})", m.from() + 1, from_card, m.to() + 1);
+        } else {
+            println!(
+                "Move {} cards from {} to {} - {}->{}",
+                count,
+                m.from() + 1,
+                m.to() + 1,
+                from_card,
+                to_card
+            );
+        }
+    }
+
+    pub fn result_of_tap(&self, play: usize) -> Option<Move> {
+        let from_pile = Pile::get(self.play[play]);
+        let mut index = from_pile.count();
+        if index < 1 {
+            return None;
+        }
+        index -= 1;
+        let mut top_card = from_pile.at(index);
+        while index > 0 && top_card.is_in_sequence_to(&from_pile.at(index - 1)) {
+            index -= 1;
+            top_card = from_pile.at(index);
+        }
+        //println!("tap on {} gives {}", play, top_card.to_string());
+        let mut candidates = vec![];
+        for i in 0..10 {
+            if i == play {
+                continue;
+            }
+            let to_pile = Pile::get(self.play[i]);
+            if to_pile.count() == 0 || top_card.fits_on_top(&to_pile.at(to_pile.count() - 1)) {
+                candidates.push((i, to_pile.sequence_of(top_card.suit())));
+            }
+        }
+        if candidates.len() == 0 {
+            return None;
+        }
+        if candidates.len() == 1 {
+            return Some(Move::regular(play, candidates[0].0, index));
+        }
+        let mut best_sequence: usize = 0;
+        for (_, sequence) in candidates.iter() {
+            if *sequence > best_sequence {
+                best_sequence = *sequence;
+            }
+        }
+        candidates.retain(|&x| x.1 == best_sequence);
+        if candidates.len() == 1 {
+            return Some(Move::regular(play, candidates[0].0, index));
+        }
+        return None;
     }
 
     pub fn chaos(&self) -> u32 {
@@ -599,11 +644,15 @@ Off: KS KH";
         let deck = Deck::parse(&text.to_string());
         let moves = deck.get_moves(true);
         // pick 2H+AH to move to 3H
-        assert_eq!(moves.len(), 1);
-        let m = moves[0];
-        assert_eq!(m.from(), 2);
-        assert_eq!(m.to(), 3);
-        assert_eq!(m.index(), 7);
+        assert_eq!(
+            moves,
+            [
+                Move::regular(0, 6, 7),
+                Move::regular(2, 3, 7),
+                Move::regular(2, 7, 7),
+                Move::regular(7, 5, 10)
+            ]
+        );
     }
 
     #[test]
@@ -630,11 +679,15 @@ Off: KS KH";
             deck.explain_move(m);
         }
         // pick 5H to move to 6H
-        assert_eq!(moves.len(), 1);
-        let m = moves[0];
-        assert_eq!(m.from(), 9);
-        assert_eq!(m.to(), 3);
-        assert_eq!(m.index(), 0);
+        assert_eq!(
+            moves,
+            [
+                Move::regular(0, 6, 7),
+                Move::regular(2, 7, 7),
+                Move::regular(4, 3, 13),
+                Move::regular(9, 3, 0)
+            ]
+        );
     }
 
     #[test]
@@ -688,11 +741,7 @@ Off: KS KH KH KS";
         let deck = Deck::parse(&text.to_string());
         let moves = deck.get_moves(true);
         // pick 9S to move to TS to uncover the other TS
-        assert_eq!(moves.len(), 1);
-        let m = moves[0];
-        assert_eq!(m.from(), 4);
-        assert_eq!(m.to(), 9);
-        assert_eq!(m.index(), 3);
+        assert!(moves.contains(&Move::regular(4, 9, 3)));
     }
 
     #[test]
@@ -890,5 +939,79 @@ Off: KS KS KS KS KH KH KH";
         let deck = Deck::parse(&text.to_string());
         assert_eq!(deck.top_card_unknown(5), true);
         assert_eq!(deck.top_card_unknown(4), false);
+    }
+
+    #[test]
+    fn result_of_tap1() {
+        let text = "Play0:
+        Play1: QH JH TH
+        Play2: 2H AH
+        Play3: KS
+        Play4: 5S 4S 3S 2S AS
+        Play5: |9S |9H 8H 7H 6H 5H
+        Play6: |7S |QS |KH |4H 3H
+        Play7: |8S JS TS
+        Play8: 6S
+        Play9:
+        Deal0:
+        Deal1:
+        Deal2:
+        Deal3:
+        Deal4:
+        Off: KS KH KH KS KH KS";
+        let deck = Deck::parse(&text.to_string());
+        assert_eq!(deck.result_of_tap(0), None);
+        //assert_eq!(deck.result_of_tap(1), Some(Move::regular(1, 3, 0)));
+        assert_eq!(deck.result_of_tap(2), Some(Move::regular(2, 6, 0)));
+        assert_eq!(deck.result_of_tap(3), None);
+        assert_eq!(deck.result_of_tap(4), Some(Move::regular(4, 8, 0)));
+        //assert_eq!(deck.result_of_tap(5), Some(Move::regular(5, 0, 2)));
+        //assert_eq!(deck.result_of_tap(6), Some(Move::regular(6, 0, 4)));
+        //assert_eq!(deck.result_of_tap(7), Some(Move::regular(7, 0, 1)));
+        assert_eq!(deck.result_of_tap(8), None);
+    }
+
+    #[test]
+    fn result_of_tap2() {
+        let text = "Play0: 7S 6S 5H 4H 3H 2H 2S JH TH 9H KS AH
+        Play1: |XX |XX |9S |2H KH QS JS TS 9S 8S 7H
+        Play2: |XX |XX |XX 4S
+        Play3: |XX |XX |XX |XX |XX KH QH AS QH 3S 8S 7S 6S
+        Play4: 6H
+        Play5: JH TH 9H 8H 7H
+        Play6: |JH QS 5H KS QS JS TS 9S 8S 7S 6S 5S TH 8H KS QS JS
+        Play7: |3H |AH |3H |4S TS 9S 6H 9H KH QH AH 4H
+        Play8: 3S JS 5H 5S 4S AS 3S
+        Play9: KS 7H 7S 6S 5S 4S 3S 2S AS
+        Deal0: 
+        Deal1: 
+        Deal2: 
+        Deal3: 
+        Deal4: 
+        Off: KH";
+        let deck = Deck::parse(&text.to_string());
+        assert_eq!(deck.result_of_tap(4), Some(Move::regular(4, 5, 0)));
+    }
+
+    #[test]
+    fn result_of_tap3() {
+        let text = "Play0: KH QH
+Play1: 
+Play2: KH QH JH TH 9H 8H 7H 6H 5H 4H
+Play3: |XX |XX |XX 4H
+Play4: 2H AH
+Play5: 4S 3S 2S AS
+Play6: |JH QS 5H KS QS JS TS 9S 8S 7S 6S 5S TH 9H 8H
+Play7: |3H |AH |3H |4S TS 9S 8S 7S 6S 5S
+Play8: 3S JS
+Play9: KS 7H 6H
+Deal0: 
+Deal1: 
+Deal2: 
+Deal3: 
+Deal4: 
+Off: KH KS KH KS";
+        let deck = Deck::parse(&text.to_string());
+        assert_eq!(deck.result_of_tap(6), None);
     }
 }

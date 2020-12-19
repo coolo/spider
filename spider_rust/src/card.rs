@@ -61,6 +61,21 @@ impl Card {
         card
     }
 
+    pub fn is_in_sequence_to(&self, next: &Card) -> bool {
+        next.faceup() && next.suit() == self.suit() && next.rank() == self.rank() + 1
+    }
+
+    pub fn fits_on_top(&self, next: &Card) -> bool {
+        next.faceup() && next.rank() == self.rank() + 1
+    }
+
+    pub fn opt_to_upper(c: Option<char>) -> Option<char> {
+        match c {
+            None => None,
+            Some(c) => c.to_uppercase().nth(0),
+        }
+    }
+
     pub fn parse(token: &str) -> Option<Card> {
         let mut card = Card::new(0);
         let mut chars = token.chars();
@@ -75,7 +90,7 @@ impl Card {
                 card.set_faceup(true);
             }
         }
-        match current {
+        match Card::opt_to_upper(current) {
             Some('A') => card.set_rank(1),
             Some('2') => card.set_rank(2),
             Some('3') => card.set_rank(3),
@@ -104,7 +119,7 @@ impl Card {
                 return None;
             }
         }
-        match chars.next() {
+        match Card::opt_to_upper(chars.next()) {
             Some('S') => card.set_suit(0),
             Some('H') => card.set_suit(1),
             Some('C') => card.set_suit(2),
@@ -276,5 +291,12 @@ mod cardtests {
     fn test_format() {
         let card = Card::parse("|AH").unwrap();
         assert_eq!(format!("Test card: {}", card), "Test card: |AH");
+    }
+
+    #[test]
+    fn is_in_sequence_to() {
+        let card1 = Card::parse("2H").unwrap();
+        let card2 = Card::parse("AH").unwrap();
+        assert!(card2.is_in_sequence_to(&card1));
     }
 }

@@ -268,6 +268,23 @@ impl Pile {
         }
         Pile::or_insert(&newcards, self.count)
     }
+
+    pub fn sequence_of(&self, suit: u8) -> usize {
+        let mut index = self.count();
+        if index == 0 {
+            return 0;
+        }
+        index -= 1;
+        let mut top_card = self.at(index);
+        if top_card.suit() != suit {
+            return 0;
+        }
+        while index > 0 && top_card.is_in_sequence_to(&self.at(index - 1)) {
+            index -= 1;
+            top_card = self.at(index);
+        }
+        self.count() - index
+    }
 }
 
 #[cfg(test)]
@@ -328,5 +345,14 @@ mod piletests {
         assert_eq!(Pile::get(pile).playable(), 1);
         let pile = Pile::parse("").expect("parsed");
         assert_eq!(Pile::get(pile).playable(), 0);
+    }
+
+    #[test]
+    fn sequence_of() {
+        let pile = Pile::parse("|AS |3S |AS |6S |3H 8S").expect("parsed");
+        assert_eq!(Pile::get(pile).sequence_of(0), 1);
+        let pile = Pile::parse("|8S 7S 6S").expect("parsed");
+        assert_eq!(Pile::get(pile).sequence_of(0), 2);
+        assert_eq!(Pile::get(pile).sequence_of(1), 0);
     }
 }
