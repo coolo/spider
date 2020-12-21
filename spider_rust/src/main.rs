@@ -61,8 +61,8 @@ fn play_one_round(filename: &str, cap: usize, suits: usize, orig_filename: Optio
             };
 
             match file.write_all(deck2.to_string().as_bytes()) {
-                Err(why) => panic!("couldn't write to tmp {}", why),
-                Ok(_) => println!("successfully wrote to tmp"),
+                Err(why) => panic!("couldn't write to {} {}", filename, why),
+                Ok(_) => println!("successfully wrote to {}", filename),
             }
 
             return true;

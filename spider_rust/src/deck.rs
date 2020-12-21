@@ -457,9 +457,11 @@ impl Deck {
                 let c = Card::known(suit, rank);
                 let index = cards
                     .iter()
-                    .position(|x| x.is_same_card(&c))
-                    .expect("card is in");
-                cards.remove(index);
+                    .position(|x| x.is_same_card(&c));
+                if index.is_none() {
+                    panic!("{} on off is already taken", c.to_string());
+                }
+                cards.remove(index.unwrap());
             }
         }
         let mut rng = thread_rng();
