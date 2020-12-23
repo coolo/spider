@@ -88,17 +88,21 @@ impl Deck {
         ret
     }
 
-    pub fn parse(contents: &String) -> Deck {
+    pub fn empty() -> Deck {
         // first thing: make sure the empty pile is first
         Pile::or_insert(&[0; 104], 0);
 
-        let mut newdeck = Deck {
+        Deck {
             play: [0; 10],
             talon: [0; 5],
             off: 0,
             moves_index: 0,
             moves: [Move::invalid(); MAX_MOVES],
-        };
+        }
+    }
+
+    pub fn parse(contents: &String) -> Deck {
+        let mut newdeck = Deck::empty();
         // that should be enough :)
         let mut index = 0;
         for line in contents.lines() {
@@ -135,6 +139,15 @@ impl Deck {
             panic!("Not all piles are parsed");
         }
         newdeck
+    }
+
+    // used in generate
+    pub fn set_play(&mut self, index: usize, pile: u32) {
+        self.play[index] = pile;
+    }
+
+    pub fn set_talon(&mut self, index: usize, pile: u32) {
+        self.talon[index] = pile;
     }
 
     pub fn win_moves(&self) -> Vec<Move> {
@@ -455,9 +468,7 @@ impl Deck {
             let suit = off.at(i).suit();
             for rank in 1..=13 {
                 let c = Card::known(suit, rank);
-                let index = cards
-                    .iter()
-                    .position(|x| x.is_same_card(&c));
+                let index = cards.iter().position(|x| x.is_same_card(&c));
                 if index.is_none() {
                     panic!("{} on off is already taken", c.to_string());
                 }

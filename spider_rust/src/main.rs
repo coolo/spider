@@ -6,9 +6,50 @@ mod pile;
 use card::Card;
 use clap::{App, Arg};
 use deck::Deck;
+use pile::Pile;
 use std::fs::File;
 use std::io;
 use std::io::Write;
+
+fn generate_deck(filename: &str) {
+    let mut deck = Deck::empty();
+    for i in 0..10 {
+        print!("Top card for Pile {}? ", i + 1);
+        io::stdout().flush().unwrap();
+        let buffer = &mut String::new();
+        io::stdin().read_line(buffer).expect("read");
+        let c = Card::parse(&buffer.trim()).expect("valid card");
+        let mut pile_str = String::from("|XX |XX |XX |XX ");
+        if i < 4 {
+            pile_str += "|XX ";
+        }
+        pile_str += &c.to_string();
+        let pile = Pile::parse(&pile_str).expect("valid pile");
+        deck.set_play(i, pile);
+        println!("{}", deck.to_string());
+    }
+    for i in 0..5 {
+        print!("Cards for Talon {}? ", i + 1);
+        io::stdout().flush().unwrap();
+        let buffer = &mut String::new();
+        io::stdin().read_line(buffer).expect("read");
+        let pile = Pile::parse(&buffer.trim()).expect("valid pile");
+        if Pile::get(pile).count() != 10 {
+            panic!("Need 10 cards")
+        }
+        deck.set_talon(i, pile);
+        println!("{}", deck.to_string());
+    }
+    let mut file = match File::create(filename) {
+        Err(why) => panic!("couldn't create file {}: {}", filename, why),
+        Ok(file) => file,
+    };
+
+    match file.write_all(deck.to_string().as_bytes()) {
+        Err(why) => panic!("couldn't write to {} {}", filename, why),
+        Ok(_) => println!("successfully wrote to {}", filename),
+    }
+}
 
 fn play_one_round(filename: &str, cap: usize, suits: usize, orig_filename: Option<&str>) -> bool {
     let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
@@ -98,9 +139,18 @@ fn main() {
                 .default_value("2")
                 .help("Number of suits"),
         )
+        .arg(
+            Arg::with_name("generate")
+                .long("generate")
+                .help("Generate a new deck file"),
+        )
         .get_matches();
 
     let filename = matches.value_of("filename").expect("filename");
+    if matches.is_present("generate") {
+        generate_deck(filename);
+        return;
+    }
     let mut cap: usize = 5000;
     if let Some(ncap) = matches.value_of("cap") {
         cap = ncap.parse().expect("Integer");

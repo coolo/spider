@@ -98,7 +98,7 @@ impl Pile {
             };
             match Card::parse(card_string) {
                 None => {
-                    println!("Card couldn't be parsed {}", card_string);
+                    println!("Card couldn't be parsed '{}'", card_string);
                     return None;
                 }
                 Some(card) => {
