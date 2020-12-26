@@ -89,13 +89,55 @@ impl Pile {
         Card::new(self.cards[index])
     }
 
+    fn parse_sequence(s: &str) -> Option<Vec<Card>> {
+        let split = s.split("..");
+        let vec: Vec<&str> = split.collect();
+        if vec.len() != 2 {
+            return None;
+        }
+        let mut start = match Card::parse(vec[0]) {
+            None => {
+                return None;
+            }
+            Some(card) => card,
+        };
+        let end = match Card::parse(vec[1]) {
+            None => {
+                return None;
+            }
+            Some(card) => card,
+        };
+        if start.suit() != end.suit() || end.rank() >= start.rank() {
+            return None;
+        }
+        let mut cards = vec![];
+        cards.push(Card::new(start.value()));
+        while start.rank() != end.rank() {
+            start.set_rank(start.rank() - 1);
+            cards.push(Card::new(start.value()));
+        }
+        return Some(cards);
+    }
+
     pub fn parse(s: &str) -> Option<u32> {
         let mut count = 0;
         let mut cards = [0; 104];
         for card_string in s.split(' ') {
             if card_string.is_empty() {
                 continue;
-            };
+            }
+            if card_string.contains("..") {
+                if let Some(seq) = Pile::parse_sequence(card_string) {
+                    for card in seq {
+                        cards[count] = card.value();
+                        count += 1;
+                    }
+                    continue;
+                } else {
+                    println!("Couldn't parse sequence {}", card_string);
+                    return None;
+                }
+            }
             match Card::parse(card_string) {
                 None => {
                     println!("Card couldn't be parsed '{}'", card_string);
@@ -295,6 +337,9 @@ mod piletests {
     fn parse() {
         let pile1 = Pile::parse("|AS |3S |AS |6S |3H 8S").expect("parsed");
         assert_eq!(Pile::get(pile1).to_string(), "|AS |3S |AS |6S |3H 8S");
+
+        let pile1 = Pile::parse("|AS |3S |AS 8S..5s").expect("parsed");
+        assert_eq!(Pile::get(pile1).to_string(), "|AS |3S |AS 8S 7S 6S 5S");
     }
 
     #[test]

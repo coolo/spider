@@ -36,7 +36,7 @@ impl Card {
     pub fn rank(&self) -> u8 {
         self.value & 15
     }
-    fn set_rank(&mut self, rank: u8) {
+    pub fn set_rank(&mut self, rank: u8) {
         self.value = (self.value & !15) + rank
     }
     pub fn suit(&self) -> u8 {
