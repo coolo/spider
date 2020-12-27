@@ -34,7 +34,7 @@ fn generate_deck(filename: &str) {
         let buffer = &mut String::new();
         io::stdin().read_line(buffer).expect("read");
         let pile = Pile::parse(&buffer.trim()).expect("valid pile");
-        if Pile::get(pile).count() != 10 {
+        if pile.count() != 10 {
             panic!("Need 10 cards")
         }
         deck.set_talon(i, pile);

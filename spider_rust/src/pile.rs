@@ -1,10 +1,87 @@
 use crate::card::Card;
-use fasthash::farm;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-use std::collections::HashMap;
+use std::mem::MaybeUninit;
+use std::rc::Rc;
+
+pub struct PileTree {
+    children: [Option<Box<PileTree>>; 256],
+    pile: Rc<Pile>,
+}
+
+// the empty one is always there
+static mut PILE_COUNT: u32 = 0;
+
+impl PileTree {
+    fn nones() -> [Option<Box<PileTree>>; 256] {
+        // https://www.joshmcguigan.com/blog/array-initialization-rust/
+        unsafe {
+            let mut arr: [Option<Box<PileTree>>; 256] = MaybeUninit::uninit().assume_init();
+            for item in &mut arr[..] {
+                std::ptr::write(item, None);
+            }
+            arr
+        }
+    }
+
+    pub fn new() -> PileTree {
+        let bytes = [0; 104];
+        PileTree {
+            children: PileTree::nones(),
+            pile: Rc::new(Pile {
+                cards: bytes,
+                count: 0,
+                chaos: 0,
+                id: 0,
+                playable: 0,
+            }),
+        }
+    }
+
+    pub fn insert_pile(&mut self, cards: &[u8; 104], count: usize, index: usize) -> Rc<Pile> {
+        if index == count && count == self.pile.count {
+            return Rc::clone(&self.pile);
+        }
+        if self.children[cards[index] as usize].is_some() {
+            let child = self.children[cards[index] as usize].as_deref_mut().unwrap();
+            return child.insert_pile(cards, count, index + 1);
+        }
+        let pile_id = unsafe {
+            PILE_COUNT += 1;
+            if PILE_COUNT > (u16::MAX as u32) * 256 {
+                panic!("We have too many piles!");
+            }
+            PILE_COUNT
+        };
+        let mut newpile = Pile {
+            cards: *cards,
+            count: index + 1,
+            chaos: 0,
+            playable: 0,
+            id: pile_id,
+        };
+        newpile.chaos = newpile.calculate_chaos();
+        newpile.playable = newpile.calculate_playable();
+
+        self.children[cards[index] as usize] = Some(Box::new(PileTree {
+            pile: Rc::new(newpile),
+            children: PileTree::nones(),
+        }));
+        return self.insert_pile(cards, count, index);
+    }
+
+    /*
+    pub fn output(&self, prefix: &str) {
+        println!("{}{}", prefix, self.pile.to_string());
+        for child in &self.children {
+            child.borrow().output(&(prefix.to_string() + "  "));
+        }
+    }
+    */
+}
 
 pub struct Pile {
+    id: u32,
     cards: [u8; 104],
     count: usize,
     chaos: u32,
@@ -12,8 +89,7 @@ pub struct Pile {
 }
 
 pub struct PileManager {
-    array: Vec<Pile>,
-    map: HashMap<u64, u32>,
+    tree: PileTree,
     lock: RwLock<u8>,
 }
 
@@ -21,44 +97,25 @@ static mut PM: Lazy<PileManager> = Lazy::new(|| PileManager::new());
 
 impl PileManager {
     pub fn new() -> PileManager {
-        let mut ret = PileManager {
-            array: vec![],
-            map: HashMap::new(),
+        let ret = PileManager {
+            tree: PileTree::new(),
             lock: RwLock::new(1),
         };
-        ret.array.reserve(50000);
         ret
     }
 
-    fn hash(cards: &[u8; 104]) -> u64 {
-        farm::hash64(cards)
-    }
-
-    fn or_insert(cards: &[u8; 104], count: usize) -> u32 {
-        let hash = PileManager::hash(&cards);
+    /*
+    pub fn output_tree() {
         unsafe {
-            let _rlock = PM.lock.read();
-            if let Some(pile) = PM.map.get(&hash) {
-                return *pile;
-            }
+            PM.tree.output("");
         }
+    }*/
 
-        let mut new = Pile {
-            cards: *cards,
-            count: count,
-            chaos: 0,
-            playable: 0,
-        };
-
-        new.chaos = new.calculate_chaos();
-        new.playable = new.calculate_playable();
-
+    fn or_insert(cards: &[u8; 104], count: usize) -> Rc<Pile> {
         unsafe {
             let _arr_lock = PM.lock.write();
-            PM.array.push(new);
-            let index = (PM.array.len() - 1) as u32;
-            PM.map.insert(hash, index);
-            index
+            let pile = PM.tree.insert_pile(cards, count, 0);
+            pile
         }
     }
 }
@@ -79,10 +136,15 @@ impl PartialEq for Pile {
 impl Eq for Pile {}
 
 impl Pile {
-    pub fn get(index: u32) -> &'static Pile {
-        // this is safe because the array is fixed size and
-        // does not relocate in other threads
-        unsafe { &PM.array[index as usize] }
+    pub fn id(&self) -> u32 {
+        self.id
+    }
+
+    pub fn empty() -> Rc<Pile> {
+        unsafe {
+            let _arr_lock = PM.lock.write();
+            Rc::clone(&PM.tree.pile)
+        }
     }
 
     pub fn at(&self, index: usize) -> Card {
@@ -119,7 +181,7 @@ impl Pile {
         return Some(cards);
     }
 
-    pub fn parse(s: &str) -> Option<u32> {
+    pub fn parse(s: &str) -> Option<Rc<Pile>> {
         let mut count = 0;
         let mut cards = [0; 104];
         for card_string in s.split(' ') {
@@ -149,7 +211,7 @@ impl Pile {
                 }
             }
         }
-        return Some(Pile::or_insert(&cards, count));
+        return Some(PileManager::or_insert(&cards, count));
     }
 
     pub fn to_string(&self) -> String {
@@ -160,11 +222,10 @@ impl Pile {
         strings.join(" ")
     }
 
-    pub fn remove_cards(pile: u32, index: usize) -> u32 {
+    pub fn remove_cards(&self, index: usize) -> Rc<Pile> {
         // shadow
-        let pile = Pile::get(pile);
-        let mut newcards = pile.cards.clone();
-        for i in index..pile.count {
+        let mut newcards = self.cards.clone();
+        for i in index..self.count {
             newcards[i] = 0;
         }
         let newcount = index;
@@ -173,39 +234,30 @@ impl Pile {
             card.set_faceup(true);
             newcards[newcount - 1] = card.value();
         }
-        Pile::or_insert(&newcards, newcount)
+        PileManager::or_insert(&newcards, newcount)
     }
 
-    pub fn replace_at(pile: u32, index: usize, c: &Card) -> u32 {
-        // shadow
-        let pile = Pile::get(pile);
-        let mut newcards = pile.cards.clone();
+    pub fn replace_at(&self, index: usize, c: &Card) -> Rc<Pile> {
+        let mut newcards = self.cards.clone();
         newcards[index] = c.value();
-        Pile::or_insert(&newcards, pile.count())
+        PileManager::or_insert(&newcards, self.count)
     }
 
-    pub fn add_card(pile: u32, card: Card) -> u32 {
-        let pile = Pile::get(pile);
-        let mut newcards = pile.cards.clone();
-        newcards[pile.count] = card.value();
-        let newcount = pile.count + 1;
-        Pile::or_insert(&newcards, newcount)
+    pub fn add_card(&self, card: Card) -> Rc<Pile> {
+        let mut newcards = self.cards.clone();
+        newcards[self.count] = card.value();
+        let newcount = self.count + 1;
+        PileManager::or_insert(&newcards, newcount)
     }
 
-    pub fn or_insert(cards: &[u8; 104], count: usize) -> u32 {
-        PileManager::or_insert(cards, count)
-    }
-
-    pub fn copy_from(pile: u32, orig_pile: u32, index: usize) -> u32 {
-        let pile = Pile::get(pile);
-        let orig_pile = Pile::get(orig_pile);
-        let mut newcards = pile.cards.clone();
-        let mut newcount = pile.count;
+    pub fn copy_from(&self, orig_pile: &Pile, index: usize) -> Rc<Pile> {
+        let mut newcards = self.cards.clone();
+        let mut newcount = self.count;
         for i in index..orig_pile.count() {
             newcards[newcount] = orig_pile.at(i).value();
             newcount += 1;
         }
-        Pile::or_insert(&newcards, newcount)
+        PileManager::or_insert(&newcards, newcount)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -296,7 +348,7 @@ impl Pile {
         }
     }
 
-    pub fn pick_unknown(&self, cards: &mut Vec<Card>) -> u32 {
+    pub fn pick_unknown(&self, cards: &mut Vec<Card>) -> Rc<Pile> {
         let mut newcards = self.cards.clone();
         for i in 0..self.count {
             let c = self.at(i);
@@ -308,7 +360,7 @@ impl Pile {
             firstpick.set_unknown(true);
             newcards[i] = firstpick.value();
         }
-        Pile::or_insert(&newcards, self.count)
+        PileManager::or_insert(&newcards, self.count)
     }
 
     pub fn sequence_of(&self, suit: u8) -> usize {
@@ -336,68 +388,65 @@ mod piletests {
     #[test]
     fn parse() {
         let pile1 = Pile::parse("|AS |3S |AS |6S |3H 8S").expect("parsed");
-        assert_eq!(Pile::get(pile1).to_string(), "|AS |3S |AS |6S |3H 8S");
+        assert_eq!(pile1.to_string(), "|AS |3S |AS |6S |3H 8S");
 
         let pile1 = Pile::parse("|AS |3S |AS 8S..5s").expect("parsed");
-        assert_eq!(Pile::get(pile1).to_string(), "|AS |3S |AS 8S 7S 6S 5S");
+        assert_eq!(pile1.to_string(), "|AS |3S |AS 8S 7S 6S 5S");
     }
 
     #[test]
     fn remove_cards() {
         let pile1 = Pile::parse("|AS |3S |AS |6S |3H 8S").expect("parsed");
-        let pile2 = Pile::remove_cards(pile1, 5);
-        assert_eq!(Pile::get(pile2).to_string(), "|AS |3S |AS |6S 3H");
-        let pile3 = Pile::remove_cards(pile2, 4);
-        assert_eq!(Pile::get(pile3).to_string(), "|AS |3S |AS 6S");
+        let pile2 = pile1.remove_cards(5);
+        assert_eq!(pile2.to_string(), "|AS |3S |AS |6S 3H");
+        let pile3 = pile2.remove_cards(4);
+        assert_eq!(pile3.to_string(), "|AS |3S |AS 6S");
         // we can repeat the operation with the same result
-        assert_eq!(Pile::remove_cards(pile1, 5), pile2);
+        assert_eq!(pile1.remove_cards(5).id, pile2.id);
     }
 
     #[test]
     fn copy_from() {
         let pile1 = Pile::parse("|AS |3S |AS |6S |3H 8S").expect("parsed");
         let pile2 = Pile::parse("|TS 7S 6S").expect("parsed");
-        let new_pile = Pile::copy_from(pile1, pile2, 1);
-        assert_eq!(
-            Pile::get(new_pile).to_string(),
-            "|AS |3S |AS |6S |3H 8S 7S 6S"
-        );
+        let new_pile = pile1.copy_from(&pile2, 1);
+        assert_eq!(new_pile.to_string(), "|AS |3S |AS |6S |3H 8S 7S 6S");
     }
 
     #[test]
     fn chaos() {
         let pile = Pile::parse("|AS |3S |AS |6S |3H 8S").expect("parsed");
-        assert_eq!(Pile::get(pile).chaos(), 17);
+        assert_eq!(pile.chaos(), 17);
         let pile = Pile::parse("|TS 7S 6S").expect("parsed");
-        assert_eq!(Pile::get(pile).chaos(), 6);
+        assert_eq!(pile.chaos(), 6);
         let pile = Pile::parse("8S 7S 6S").expect("parsed");
-        assert_eq!(Pile::get(pile).chaos(), 4);
+        assert_eq!(pile.chaos(), 4);
         let pile = Pile::parse("8S 7H 6S").expect("parsed");
-        assert_eq!(Pile::get(pile).chaos(), 6);
+        assert_eq!(pile.chaos(), 6);
     }
 
     #[test]
     fn playable() {
         let pile = Pile::parse("|AS |3S |AS |6S |3H 8S").expect("parsed");
-        assert_eq!(Pile::get(pile).playable(), 1);
+        assert_eq!(pile.playable(), 1);
         let pile = Pile::parse("|8S 7S 6S").expect("parsed");
-        assert_eq!(Pile::get(pile).playable(), 2);
+        assert_eq!(pile.playable(), 2);
         let pile = Pile::parse("8S 7S 6S").expect("parsed");
-        assert_eq!(Pile::get(pile).playable(), 3);
+        assert_eq!(pile.playable(), 3);
         let pile = Pile::parse("8S 7H 6S").expect("parsed");
-        assert_eq!(Pile::get(pile).playable(), 1);
+        assert_eq!(pile.playable(), 1);
         let pile = Pile::parse("8S").expect("parsed");
-        assert_eq!(Pile::get(pile).playable(), 1);
+        assert_eq!(pile.playable(), 1);
         let pile = Pile::parse("").expect("parsed");
-        assert_eq!(Pile::get(pile).playable(), 0);
+        assert_eq!(pile.playable(), 0);
     }
 
     #[test]
     fn sequence_of() {
         let pile = Pile::parse("|AS |3S |AS |6S |3H 8S").expect("parsed");
-        assert_eq!(Pile::get(pile).sequence_of(0), 1);
+        assert_eq!(pile.sequence_of(0), 1);
         let pile = Pile::parse("|8S 7S 6S").expect("parsed");
-        assert_eq!(Pile::get(pile).sequence_of(0), 2);
-        assert_eq!(Pile::get(pile).sequence_of(1), 0);
+        assert_eq!(pile.sequence_of(0), 2);
+        assert_eq!(pile.sequence_of(1), 0);
     }
 }

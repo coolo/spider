@@ -1,24 +1,24 @@
 use crate::card::Card;
 use crate::moves::Move;
 use crate::pile::Pile;
-use fasthash::farm;
+use fasthash::city;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
-use std::mem::MaybeUninit;
 use std::ptr;
 use std::rc::Rc;
 
 const MAX_MOVES: usize = 200;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Deck {
-    play: [u32; 10],
-    talon: [u32; 5],
-    off: u32,
+    play: [Rc<Pile>; 10],
+    talon: [Rc<Pile>; 5],
+    off: Rc<Pile>,
     moves: [Move; MAX_MOVES],
     moves_index: usize,
+    hashbytes: [u8; 16 * 3],
 }
 
 #[derive(Clone)]
@@ -54,24 +54,13 @@ impl PartialOrd for WeightedMove {
 }
 
 impl Deck {
-    pub fn hash(&self, seed: u32) -> u64 {
-        let plays = self.play.as_ptr() as *const u8;
-        let talons = self.talon.as_ptr() as *const u8;
-        unsafe {
-            let mut bytes: [u8; 68] = MaybeUninit::zeroed().assume_init();
-            ptr::copy_nonoverlapping(plays, bytes.as_mut_ptr(), 40);
-            ptr::copy_nonoverlapping(talons, bytes.as_mut_ptr().offset(40), 20);
-            let t = std::mem::transmute::<u32, [u8; 4]>(self.off);
-            ptr::copy_nonoverlapping(t.as_ptr(), bytes.as_mut_ptr().offset(60), 4);
-            let t = std::mem::transmute::<u32, [u8; 4]>(seed);
-            ptr::copy_nonoverlapping(t.as_ptr(), bytes.as_mut_ptr().offset(64), 4);
-            farm::hash64(bytes)
-        }
+    pub fn hash(&self) -> u64 {
+        city::hash64(self.hashbytes)
     }
 
     #[allow(dead_code)]
     pub fn is_won(&self) -> bool {
-        Pile::get(self.off).count() == 8
+        self.off.count() == 8
     }
 
     pub fn reset_moves(&mut self) {
@@ -79,9 +68,10 @@ impl Deck {
     }
 
     pub fn talons_left(&self) -> u32 {
+        // TODO: store as property
         let mut ret = 0;
         for i in 0..5 {
-            if self.talon[i] == 0 {
+            if self.talon[i].count() == 0 {
                 ret += 1
             }
         }
@@ -89,15 +79,30 @@ impl Deck {
     }
 
     pub fn empty() -> Deck {
-        // first thing: make sure the empty pile is first
-        Pile::or_insert(&[0; 104], 0);
-
         Deck {
-            play: [0; 10],
-            talon: [0; 5],
-            off: 0,
+            play: [
+                Rc::clone(&Pile::empty()),
+                Rc::clone(&Pile::empty()),
+                Rc::clone(&Pile::empty()),
+                Rc::clone(&Pile::empty()),
+                Rc::clone(&Pile::empty()),
+                Rc::clone(&Pile::empty()),
+                Rc::clone(&Pile::empty()),
+                Rc::clone(&Pile::empty()),
+                Rc::clone(&Pile::empty()),
+                Rc::clone(&Pile::empty()),
+            ],
+            talon: [
+                Rc::clone(&Pile::empty()),
+                Rc::clone(&Pile::empty()),
+                Rc::clone(&Pile::empty()),
+                Rc::clone(&Pile::empty()),
+                Rc::clone(&Pile::empty()),
+            ],
+            off: Pile::empty(),
             moves_index: 0,
             moves: [Move::invalid(); MAX_MOVES],
+            hashbytes: [0; 16 * 3],
         }
     }
 
@@ -124,12 +129,15 @@ impl Deck {
                     let parsed = Pile::parse(pile);
                     match parsed {
                         None => panic!("Failed to parse {}", pile),
-                        Some(pile) => match index {
-                            0..=9 => newdeck.play[index] = pile,
-                            10..=14 => newdeck.talon[index - 10] = pile,
-                            15 => newdeck.off = pile,
-                            _ => panic!("We went too far"),
-                        },
+                        Some(pile) => {
+                            newdeck.set_hashbytes(index, &pile);
+                            match index {
+                                0..=9 => newdeck.play[index] = pile,
+                                10..=14 => newdeck.talon[index - 10] = pile,
+                                15 => newdeck.off = pile,
+                                _ => panic!("We went too far"),
+                            }
+                        }
                     }
                 }
             }
@@ -141,13 +149,30 @@ impl Deck {
         newdeck
     }
 
-    // used in generate
-    pub fn set_play(&mut self, index: usize, pile: u32) {
+    fn set_hashbytes(&mut self, index: usize, pile: &Rc<Pile>) {
+        unsafe {
+            let t = std::mem::transmute::<u32, [u8; 4]>(pile.id());
+            ptr::copy_nonoverlapping(
+                t.as_ptr() as *const u8,
+                self.hashbytes.as_mut_ptr().offset((index * 3) as isize),
+                3,
+            );
+        }
+    }
+
+    pub fn set_play(&mut self, index: usize, pile: Rc<Pile>) {
+        self.set_hashbytes(index, &pile);
         self.play[index] = pile;
     }
 
-    pub fn set_talon(&mut self, index: usize, pile: u32) {
+    pub fn set_talon(&mut self, index: usize, pile: Rc<Pile>) {
+        self.set_hashbytes(index + 10, &pile);
         self.talon[index] = pile;
+    }
+
+    pub fn set_off(&mut self, pile: Rc<Pile>) {
+        self.set_hashbytes(15, &pile);
+        self.off = pile;
     }
 
     pub fn win_moves(&self) -> Vec<Move> {
@@ -160,12 +185,12 @@ impl Deck {
     pub fn to_string(&self) -> String {
         let mut result = String::new();
         for i in 0..10 {
-            result += &format!("Play{}: {}\n", i, Pile::get(self.play[i]).to_string());
+            result += &format!("Play{}: {}\n", i, self.play[i].to_string());
         }
         for i in 0..5 {
-            result += &format!("Deal{}: {}\n", i, Pile::get(self.talon[i]).to_string());
+            result += &format!("Deal{}: {}\n", i, self.talon[i].to_string());
         }
-        result += &format!("Off: {}", Pile::get(self.off).to_string());
+        result += &format!("Off: {}", self.off.to_string());
         result
     }
 
@@ -174,8 +199,7 @@ impl Deck {
 
         let mut next_talon: Option<usize> = None;
         for i in 0..5 {
-            let talon = Pile::get(self.talon[i]);
-            if !talon.is_empty() {
+            if !self.talon[i].is_empty() {
                 next_talon = Some(i);
                 break;
             }
@@ -183,18 +207,12 @@ impl Deck {
         // can't pull the talon if it turns true
         let mut one_is_empty = false;
 
-        // translate ID into reference for quicker access
-        let mut play_refs = Vec::new();
-        for i in 0..10 {
-            play_refs.push(Pile::get(self.play[i]));
-        }
-
         for from in 0..10 {
-            if play_refs[from].is_empty() {
+            if self.play[from].is_empty() {
                 one_is_empty = true;
                 continue;
             }
-            let from_pile = &play_refs[from];
+            let from_pile = &self.play[from];
             let mut index = from_pile.count() - 1;
             let top_card = from_pile.at(index);
 
@@ -218,7 +236,6 @@ impl Deck {
                     // off move
                     vec.clear();
                     vec.push(Move::off(from, index));
-                    //println!("Found off move");
                     return vec;
                 }
 
@@ -236,7 +253,7 @@ impl Deck {
                     if to == from {
                         continue;
                     }
-                    let to_pile = &play_refs[to];
+                    let to_pile = &self.play[to];
                     let to_count = to_pile.count();
 
                     if to_count > 0 {
@@ -306,8 +323,8 @@ impl Deck {
             return;
         }
         // happy casting to avoid storing every index as 64 bits
-        let from_pile = Pile::get(self.play[m.from()]);
-        let to_pile = Pile::get(self.play[m.to()]);
+        let from_pile = &self.play[m.from()];
+        let to_pile = &self.play[m.to()];
         let from_card = from_pile.at(m.index()).to_string();
         let mut to_card = String::from("Empty");
         if to_pile.count() > 0 {
@@ -331,7 +348,7 @@ impl Deck {
     }
 
     pub fn result_of_tap(&self, play: usize) -> Option<Move> {
-        let from_pile = Pile::get(self.play[play]);
+        let from_pile = &self.play[play];
         let mut index = from_pile.count();
         if index < 1 {
             return None;
@@ -348,7 +365,7 @@ impl Deck {
             if i == play {
                 continue;
             }
-            let to_pile = Pile::get(self.play[i]);
+            let to_pile = &self.play[i];
             if to_pile.count() == 0 || top_card.fits_on_top(&to_pile.at(to_pile.count() - 1)) {
                 candidates.push((i, to_pile.sequence_of(top_card.suit())));
             }
@@ -375,7 +392,7 @@ impl Deck {
     pub fn chaos(&self) -> u32 {
         let mut result = 0;
         for i in 0..10 {
-            result += Pile::get(self.play[i]).chaos();
+            result += self.play[i].chaos();
         }
         result
     }
@@ -383,9 +400,9 @@ impl Deck {
     pub fn playable(&self) -> u32 {
         let mut result: u32 = 0;
         for i in 0..10 {
-            result += Pile::get(self.play[i]).playable();
+            result += self.play[i].playable();
         }
-        result + 13 * (Pile::get(self.off).count() as u32)
+        result + 13 * (self.off.count() as u32)
     }
 
     pub fn apply_move(&self, m: &Move) -> Deck {
@@ -399,25 +416,28 @@ impl Deck {
         if m.is_talon() {
             let from_pile = m.from();
             for to in 0..10 {
-                let mut c = Pile::get(self.talon[from_pile]).at(to);
+                let mut c = self.talon[from_pile].at(to);
                 c.set_faceup(true);
-                newdeck.play[to] = Pile::add_card(self.play[to], c);
+                newdeck.set_play(to, self.play[to].add_card(c));
             }
-            newdeck.talon[m.from()] = Pile::parse("").unwrap();
-            assert_eq!(newdeck.talon[m.from()], 0);
+            newdeck.set_talon(m.from(), Pile::empty());
+            assert_eq!(newdeck.talon[m.from()].count(), 0);
             return newdeck;
         }
 
         if m.is_off() {
             let from_index = m.from();
-            let from_pile = Pile::get(self.play[from_index]);
+            let from_pile = &self.play[from_index];
             let c = from_pile.at(from_pile.count() - 13);
-            newdeck.off = Pile::add_card(self.off, c);
-            newdeck.play[m.from()] = Pile::remove_cards(self.play[m.from()], m.index());
+            newdeck.set_off(self.off.add_card(c));
+            newdeck.set_play(m.from(), self.play[m.from()].remove_cards(m.index()));
             return newdeck;
         }
-        newdeck.play[m.to()] = Pile::copy_from(self.play[m.to()], self.play[m.from()], m.index());
-        newdeck.play[m.from()] = Pile::remove_cards(self.play[m.from()], m.index());
+        newdeck.set_play(
+            m.to(),
+            self.play[m.to()].copy_from(&self.play[m.from()], m.index()),
+        );
+        newdeck.set_play(m.from(), self.play[m.from()].remove_cards(m.index()));
         newdeck
     }
 
@@ -430,7 +450,7 @@ impl Deck {
                 chaos: newdeck.chaos(),
                 playable: newdeck.playable(),
                 talons: newdeck.talons_left(),
-                hash: newdeck.hash(0),
+                hash: newdeck.hash(),
                 deck: newdeck,
             });
         }
@@ -458,12 +478,12 @@ impl Deck {
     pub fn shuffle_unknowns(&mut self, n_suits: usize) {
         let mut cards = Deck::full_deck(n_suits);
         for i in 0..10 {
-            Pile::get(self.play[i]).remove_known(&mut cards);
+            self.play[i].remove_known(&mut cards);
         }
         for i in 0..5 {
-            Pile::get(self.talon[i]).remove_known(&mut cards);
+            self.talon[i].remove_known(&mut cards);
         }
-        let off = Pile::get(self.off);
+        let off = &self.off;
         for i in 0..off.count() {
             let suit = off.at(i).suit();
             for rank in 1..=13 {
@@ -475,14 +495,16 @@ impl Deck {
                 cards.remove(index.unwrap());
             }
         }
-        let mut rng = thread_rng();
-        cards.shuffle(&mut rng);
-        println!("Cards {}", Card::vec_as_string(&cards));
+        if !cards.is_empty() {
+            let mut rng = thread_rng();
+            cards.shuffle(&mut rng);
+            //println!("Cards {}", Card::vec_as_string(&cards));
+        }
         for i in 0..10 {
-            self.play[i] = Pile::get(self.play[i]).pick_unknown(&mut cards);
+            self.set_play(i, self.play[i].pick_unknown(&mut cards));
         }
         for i in 0..5 {
-            self.talon[i] = Pile::get(self.talon[i]).pick_unknown(&mut cards);
+            self.set_talon(i, self.talon[i].pick_unknown(&mut cards));
         }
         if cards.len() > 0 {
             panic!("There are cards left: {}", Card::vec_as_string(&cards));
@@ -495,7 +517,7 @@ impl Deck {
         // sort only the index
         let mut new_unvisited: Vec<WeightedMove> = Vec::new();
         let mut visited = BTreeSet::new();
-        visited.insert(self.hash(0));
+        visited.insert(self.hash());
 
         let mut depth: i32 = 0;
 
@@ -518,7 +540,7 @@ impl Deck {
             new_unvisited.reverse();
 
             let mut iterator = new_unvisited.iter();
-            let mut printed = false;
+            let mut printed = true;
             loop {
                 if let Some(wm) = iterator.next() {
                     if visited.contains(&wm.hash) {
@@ -556,7 +578,7 @@ impl Deck {
     }
 
     pub fn top_card_unknown(&self, index: usize) -> bool {
-        let pile = Pile::get(self.play[index]);
+        let pile = &self.play[index];
         if pile.count() == 0 {
             return false;
         }
@@ -565,8 +587,9 @@ impl Deck {
 
     pub fn replace_play_card(&mut self, play: usize, index: usize, c: &Card) {
         let mut c = Card::new(c.value());
-        c.set_faceup(Pile::get(self.play[play]).at(index).faceup());
-        self.play[play] = Pile::replace_at(self.play[play], index, &c);
+        c.set_faceup(self.play[play].at(index).faceup());
+        let new = self.play[play].replace_at(index, &c);
+        self.play[play] = new;
     }
 }
 
@@ -580,7 +603,7 @@ mod decktests {
 Play1: |AH |4H QH JH TH 9H 8H 7H 6H 5H
 Play2: |TH |2S |JS |KS |KS QH JH 2H AH
 Play3: |6H 3H
-Play4: |TH |3S |TS 9S 8S KH QH JH TS 9H 8H 7H 6H 5S 4S 3S 2S AS
+Play4: |TH |2S |TS 9S 8S KH QH JH TS 9H 8H 7H 6H 5S 4S 3S 3S AS
 Play5: |9S |9H 8H 7H
 Play6: |7S |QS |KH |4H 3H 2H
 Play7: |8S |JS |7S AS 5H 4H 2S AS KH QS 6S 5S 4S 3S
