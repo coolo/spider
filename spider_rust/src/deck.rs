@@ -9,7 +9,7 @@ use std::collections::BTreeSet;
 use std::ptr;
 use std::rc::Rc;
 
-const MAX_MOVES: usize = 200;
+const MAX_MOVES: usize = 250;
 
 #[derive(Clone)]
 pub struct Deck {
