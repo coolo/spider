@@ -1,0 +1,17 @@
+# 3.1 4 colours 
+Play0: |4S |TC |7D |3C |4D AH
+Play1: |9D |6C |7H |5D |JD 7H
+Play2: |9S |6H |JC |8S |AH KH
+Play3: |AS |4C |9C |KC |AC 7S
+Play4: |JC |3H |6S |4S 7S
+Play5: |QD |TS |JH |2H 8D
+Play6: |6D |JD |7D |2S 4H
+Play7: |7C |9C |AS |AC KD
+Play8: |8C |4H |TH |5C 3S
+Play9: |JH |4C |3C |AD 8H
+Deal0: 2C TC 2D 4D 2S 8C 5S 9H 5S 5H
+Deal1: QD 3H KS 6H AD QH TS 2C TD JS
+Deal2: 3D 6S 2H KS 8D 8H KD TD QC 9S
+Deal3: 7C JS QH KH 5C 9D 5H KC QS 6D
+Deal4: TH 3D 2D 5D QC 8S QS 3S 6C 9H
+Off: 
