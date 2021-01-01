@@ -1,7 +1,7 @@
 use crate::card::Card;
 use crate::moves::Move;
 use crate::pile::Pile;
-use fasthash::city;
+use seahash;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use std::cmp::Ordering;
@@ -55,7 +55,7 @@ impl PartialOrd for WeightedMove {
 
 impl Deck {
     pub fn hash(&self) -> u64 {
-        city::hash64(self.hashbytes)
+        seahash::hash(&self.hashbytes as &[u8])
     }
 
     #[allow(dead_code)]

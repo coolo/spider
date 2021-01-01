@@ -124,6 +124,8 @@ fn main() {
         .arg(
             Arg::with_name("filename")
                 .takes_value(true)
+                .multiple(false)
+                .required(true)
                 .help("Temporary file name"),
         )
         .arg(
