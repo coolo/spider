@@ -38,13 +38,25 @@ impl PileTree {
         }
     }
 
-    pub fn insert_pile(&mut self, cards: &[u8; 104], count: usize, index: usize) -> Rc<Pile> {
-        if index == count && count == self.pile.count {
-            return Rc::clone(&self.pile);
-        }
-        if self.children[cards[index] as usize].is_some() {
-            let child = self.children[cards[index] as usize].as_deref_mut().unwrap();
-            return child.insert_pile(cards, count, index + 1);
+    pub fn insert_pile(
+        tree_p: &mut PileTree,
+        cards: &[u8; 104],
+        count: usize,
+        index_p: usize,
+    ) -> Rc<Pile> {
+        let mut tree = tree_p;
+        let mut index = index_p;
+        loop {
+            if index == count && count == tree.pile.count {
+                return Rc::clone(&tree.pile);
+            }
+            if tree.children[cards[index] as usize].is_some() {
+                let child = tree.children[cards[index] as usize].as_deref_mut().unwrap();
+                tree = child;
+                index = index + 1;
+            } else {
+                break;
+            }
         }
         let pile_id = unsafe {
             PILE_COUNT += 1;
@@ -63,11 +75,11 @@ impl PileTree {
         newpile.chaos = newpile.calculate_chaos();
         newpile.playable = newpile.calculate_playable();
 
-        self.children[cards[index] as usize] = Some(Box::new(PileTree {
+        tree.children[cards[index] as usize] = Some(Box::new(PileTree {
             pile: Rc::new(newpile),
             children: PileTree::nones(),
         }));
-        return self.insert_pile(cards, count, index);
+        return PileTree::insert_pile(tree, cards, count, index);
     }
 
     /*
@@ -114,7 +126,7 @@ impl PileManager {
     fn or_insert(cards: &[u8; 104], count: usize) -> Rc<Pile> {
         unsafe {
             let _arr_lock = PM.lock.write();
-            let pile = PM.tree.insert_pile(cards, count, 0);
+            let pile = PileTree::insert_pile(&mut PM.tree, cards, count, 0);
             pile
         }
     }
