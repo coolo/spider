@@ -1,6 +1,5 @@
 use crate::card::Card;
 use once_cell::sync::Lazy;
-use parking_lot::RwLock;
 use std::mem::MaybeUninit;
 use std::rc::Rc;
 
@@ -102,7 +101,6 @@ pub struct Pile {
 
 pub struct PileManager {
     tree: PileTree,
-    lock: RwLock<u8>,
 }
 
 static mut PM: Lazy<PileManager> = Lazy::new(|| PileManager::new());
@@ -111,7 +109,6 @@ impl PileManager {
     pub fn new() -> PileManager {
         let ret = PileManager {
             tree: PileTree::new(),
-            lock: RwLock::new(1),
         };
         ret
     }
@@ -124,11 +121,7 @@ impl PileManager {
     }*/
 
     fn or_insert(cards: &[u8; 104], count: usize) -> Rc<Pile> {
-        unsafe {
-            let _arr_lock = PM.lock.write();
-            let pile = PileTree::insert_pile(&mut PM.tree, cards, count, 0);
-            pile
-        }
+        unsafe { PileTree::insert_pile(&mut PM.tree, cards, count, 0) }
     }
 }
 
@@ -153,10 +146,7 @@ impl Pile {
     }
 
     pub fn empty() -> Rc<Pile> {
-        unsafe {
-            let _arr_lock = PM.lock.write();
-            Rc::clone(&PM.tree.pile)
-        }
+        unsafe { Rc::clone(&PM.tree.pile) }
     }
 
     pub fn at(&self, index: usize) -> Card {

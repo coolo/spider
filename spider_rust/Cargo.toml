@@ -3,12 +3,11 @@ name = "spider_rust"
 version = "0.1.0"
 authors = ["Stephan Kulow <stephan@kulow.org>"]
 edition = "2018"
-
+ #![feature(wrapping_int_impl)] 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 once_cell = "1.5.2"
-parking_lot = "0.11.1"
 rand = "0.7.3"
 clap = "2.33.3"
 seahash = "4.0.1"
