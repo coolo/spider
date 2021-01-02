@@ -2,12 +2,11 @@ use crate::card::Card;
 use crate::intset::Intset;
 use crate::moves::Move;
 use crate::pile::Pile;
-use rand::seq::SliceRandom;
-use rand::thread_rng;
 use seahash;
 use std::cmp::Ordering;
 use std::ptr;
 use std::rc::Rc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const MAX_MOVES: usize = 250;
 
@@ -500,8 +499,13 @@ impl Deck {
             }
         }
         if !cards.is_empty() {
-            let mut rng = thread_rng();
-            cards.shuffle(&mut rng);
+            Card::shuffle(
+                &mut cards,
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+            );
             //println!("Cards {}", Card::vec_as_string(&cards));
         }
         for i in 0..10 {

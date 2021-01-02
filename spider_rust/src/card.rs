@@ -205,6 +205,29 @@ impl Card {
         // we could also compare the bitmasked value, but this is easier to read
         self.rank() == other.rank() && self.suit() == other.suit()
     }
+
+    pub fn shuffle(cards: &mut Vec<Card>, init_seed: u64) {
+        if cards.len() < 2 {
+            return;
+        }
+        let mut seed = init_seed;
+        for _ in 0..1000 {
+            seed = 214013 * seed + 2531011;
+            let rand = ((seed >> 16) & 0x7fff) as usize;
+
+            let card1 = rand % cards.len();
+            seed = 214013 * seed + 2531011;
+            let rand = ((seed >> 16) & 0x7fff) as usize;
+
+            let card2 = rand % cards.len();
+            if card1 == card2 {
+                continue;
+            }
+            let c = cards[card1].value();
+            cards[card1] = Card::new(cards[card2].value());
+            cards[card2] = Card::new(c);
+        }
+    }
 }
 
 impl fmt::Display for Card {
