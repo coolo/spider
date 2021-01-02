@@ -62,7 +62,7 @@ fn play_one_round(
     let mut deck = Deck::parse(&contents);
     deck.shuffle_unknowns(suits);
 
-    let result = deck.shortest_path(cap, 80_000_000, debug);
+    let result = deck.shortest_path(cap, debug);
     if result.is_none() {
         return false;
     }

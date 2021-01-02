@@ -5,7 +5,7 @@ use rand::seq::SliceRandom;
 use rand::thread_rng;
 use seahash;
 use std::cmp::Ordering;
-use std::collections::BTreeSet;
+use std::collections::HashSet;
 use std::ptr;
 use std::rc::Rc;
 
@@ -515,26 +515,19 @@ impl Deck {
         }
     }
 
-    pub fn shortest_path(&mut self, cap: usize, limit: usize, debug: bool) -> Option<i32> {
+    pub fn shortest_path(&mut self, cap: usize, debug: bool) -> Option<i32> {
         let mut unvisited: [Vec<Rc<Deck>>; 6] = Default::default();
         unvisited[self.talons_left() as usize].push(Rc::new(self.clone()));
         // sort only the index
         let mut new_unvisited: Vec<WeightedMove> = Vec::new();
-        let mut visited = BTreeSet::new();
-        visited.insert(self.hash());
 
         let mut depth: i32 = 0;
 
         loop {
-            if visited.len() > limit {
-                return None;
-            }
             for i in 0..=5 {
                 for deck in &unvisited[i] {
                     Deck::pick_one_for_shortest_path(&deck, &mut new_unvisited);
                 }
-            }
-            for i in 0..=5 {
                 unvisited[i].clear();
             }
             if new_unvisited.len() == 0 {
@@ -545,9 +538,11 @@ impl Deck {
 
             let mut iterator = new_unvisited.iter();
             let mut printed = !debug;
+            let mut seen = HashSet::new();
+
             loop {
                 if let Some(wm) = iterator.next() {
-                    if visited.contains(&wm.hash) {
+                    if seen.contains(&wm.hash) {
                         continue;
                     }
                     if wm.chaos == 0 {
@@ -567,7 +562,7 @@ impl Deck {
                         printed = true;
                     }
                     if unvisited[wm.talons as usize].len() < cap {
-                        visited.insert(wm.hash);
+                        seen.insert(wm.hash);
                         unvisited[wm.talons as usize].push(Rc::clone(&wm.deck));
                     }
                 } else {
@@ -869,7 +864,7 @@ Off: KS KS KS KS KH KH KH";
         Deal4: 
         Off: KS KS KS KS KH KH KH";
         let mut deck = Deck::parse(&text.to_string());
-        assert_eq!(deck.shortest_path(3400, 100, false).expect("winnable"), 3);
+        assert_eq!(deck.shortest_path(3400, false).expect("winnable"), 3);
     }
 
     #[test]
@@ -895,9 +890,8 @@ Off: KS KS KS KS KH KH KH";
         Deal4: 
         Off: KS KH KH KS KS";
         let mut deck = Deck::parse(&text.to_string());
-        let res = deck.shortest_path(3400, 5000, false);
-        //assert_eq!(res.expect("winnable"), 28);
-        assert!(res.is_none()); // requires a little more capacity
+        let res = deck.shortest_path(3400, false);
+        assert_eq!(res.expect("winnable"), 28);
     }
 
     #[test]
@@ -921,7 +915,7 @@ Off: KS KS KS KS KH KH KH";
         Off: KS KH KH KS KH KS";
         let mut deck = Deck::parse(&text.to_string());
         // win in 17 moves
-        let res = deck.shortest_path(4400, 80000, false);
+        let res = deck.shortest_path(5400, false);
         assert_eq!(res.expect("winnable"), 17);
         /*
         let win_moves = deck.win_moves();
@@ -955,7 +949,7 @@ Off: KS KS KS KS KH KH KH";
         Deal4: 
         Off: KS";
         let mut deck = Deck::parse(&text.to_string());
-        let res = deck.shortest_path(3400, 50000, false);
+        let res = deck.shortest_path(3400, false);
         assert_eq!(res.expect("out of options"), -2);
     }
 
