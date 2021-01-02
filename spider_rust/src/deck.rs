@@ -536,9 +536,8 @@ impl Deck {
                 break;
             }
             new_unvisited.sort_unstable();
-            new_unvisited.reverse();
 
-            let mut iterator = new_unvisited.iter();
+            let mut iterator = new_unvisited.iter().rev();
             let mut printed = !debug;
 
             let mut last_chaos = 0;
