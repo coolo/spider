@@ -10,12 +10,17 @@ pub struct Card {
 }
 
 impl Card {
+    #[inline]
     pub fn value(&self) -> u8 {
         self.value
     }
+
+    #[inline]
     pub fn faceup(&self) -> bool {
         self.value & (1 << 6) > 0
     }
+
+    #[inline]
     pub fn set_faceup(&mut self, face: bool) {
         if face {
             self.value = self.value | (1 << 6)
@@ -23,9 +28,13 @@ impl Card {
             self.value = self.value & !(1 << 6)
         }
     }
+
+    #[inline]
     pub fn is_unknown(&self) -> bool {
         self.value & (1 << 7) > 0
     }
+
+    #[inline]
     pub fn set_unknown(&mut self, unknown: bool) {
         if unknown {
             self.value = self.value | (1 << 7)
@@ -33,15 +42,23 @@ impl Card {
             self.value = self.value & !(1 << 7)
         }
     }
+
+    #[inline]
     pub fn rank(&self) -> u8 {
         self.value & 15
     }
+
+    #[inline]
     pub fn set_rank(&mut self, rank: u8) {
         self.value = (self.value & !15) + rank
     }
+
+    #[inline]
     pub fn suit(&self) -> u8 {
         (self.value >> 4) & 3
     }
+
+    #[inline]
     fn set_suit(&mut self, suit: u8) {
         let _rank = self.rank();
         self.value = self.value >> 4;
