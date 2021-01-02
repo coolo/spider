@@ -541,8 +541,14 @@ impl Deck {
             let mut iterator = new_unvisited.iter();
             let mut printed = !debug;
 
+            let mut last_chaos = 0;
+
             loop {
                 if let Some(wm) = iterator.next() {
+                    if last_chaos != wm.chaos {
+                        seen.clear();
+                        last_chaos = wm.chaos;
+                    }
                     if seen.contains(&wm.hash) {
                         continue;
                     }
