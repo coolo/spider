@@ -37,6 +37,7 @@ impl PileTree {
         }
     }
 
+    #[inline]
     pub fn insert_pile(
         tree_p: &mut PileTree,
         cards: &[u8; 104],
@@ -91,38 +92,14 @@ impl PileTree {
     */
 }
 
+static mut PILE_TREE: Lazy<PileTree> = Lazy::new(|| PileTree::new());
+
 pub struct Pile {
     id: u32,
     cards: [u8; 104],
     count: usize,
     chaos: u32,
     playable: u32,
-}
-
-pub struct PileManager {
-    tree: PileTree,
-}
-
-static mut PM: Lazy<PileManager> = Lazy::new(|| PileManager::new());
-
-impl PileManager {
-    pub fn new() -> PileManager {
-        let ret = PileManager {
-            tree: PileTree::new(),
-        };
-        ret
-    }
-
-    /*
-    pub fn output_tree() {
-        unsafe {
-            PM.tree.output("");
-        }
-    }*/
-
-    fn or_insert(cards: &[u8; 104], count: usize) -> Rc<Pile> {
-        unsafe { PileTree::insert_pile(&mut PM.tree, cards, count, 0) }
-    }
 }
 
 impl PartialEq for Pile {
@@ -141,12 +118,16 @@ impl PartialEq for Pile {
 impl Eq for Pile {}
 
 impl Pile {
+    pub fn or_insert(cards: &[u8; 104], count: usize) -> Rc<Pile> {
+        unsafe { PileTree::insert_pile(&mut PILE_TREE, cards, count, 0) }
+    }
+
     pub fn id(&self) -> u32 {
         self.id
     }
 
     pub fn empty() -> Rc<Pile> {
-        unsafe { Rc::clone(&PM.tree.pile) }
+        unsafe { Rc::clone(&PILE_TREE.pile) }
     }
 
     pub fn at(&self, index: usize) -> Card {
@@ -213,7 +194,7 @@ impl Pile {
                 }
             }
         }
-        return Some(PileManager::or_insert(&cards, count));
+        return Some(Pile::or_insert(&cards, count));
     }
 
     pub fn to_string(&self) -> String {
@@ -236,20 +217,20 @@ impl Pile {
             card.set_faceup(true);
             newcards[newcount - 1] = card.value();
         }
-        PileManager::or_insert(&newcards, newcount)
+        Pile::or_insert(&newcards, newcount)
     }
 
     pub fn replace_at(&self, index: usize, c: &Card) -> Rc<Pile> {
         let mut newcards = self.cards.clone();
         newcards[index] = c.value();
-        PileManager::or_insert(&newcards, self.count)
+        Pile::or_insert(&newcards, self.count)
     }
 
     pub fn add_card(&self, card: Card) -> Rc<Pile> {
         let mut newcards = self.cards.clone();
         newcards[self.count] = card.value();
         let newcount = self.count + 1;
-        PileManager::or_insert(&newcards, newcount)
+        Pile::or_insert(&newcards, newcount)
     }
 
     pub fn copy_from(&self, orig_pile: &Pile, index: usize) -> Rc<Pile> {
@@ -259,7 +240,7 @@ impl Pile {
             newcards[newcount] = orig_pile.at(i).value();
             newcount += 1;
         }
-        PileManager::or_insert(&newcards, newcount)
+        Pile::or_insert(&newcards, newcount)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -362,7 +343,7 @@ impl Pile {
             firstpick.set_unknown(true);
             newcards[i] = firstpick.value();
         }
-        PileManager::or_insert(&newcards, self.count)
+        Pile::or_insert(&newcards, self.count)
     }
 
     pub fn sequence_of(&self, suit: u8) -> usize {
