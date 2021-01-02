@@ -1,6 +1,7 @@
 use std::fs;
 mod card;
 mod deck;
+mod intset;
 mod moves;
 mod pile;
 use card::Card;

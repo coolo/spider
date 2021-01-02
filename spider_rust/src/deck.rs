@@ -1,11 +1,11 @@
 use crate::card::Card;
+use crate::intset::Intset;
 use crate::moves::Move;
 use crate::pile::Pile;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use seahash;
 use std::cmp::Ordering;
-use std::collections::HashSet;
 use std::ptr;
 use std::rc::Rc;
 
@@ -520,6 +520,8 @@ impl Deck {
         unvisited[self.talons_left() as usize].push(Rc::new(self.clone()));
         // sort only the index
         let mut new_unvisited: Vec<WeightedMove> = Vec::new();
+        // worst case
+        let mut seen = Intset::new(cap * 6);
 
         let mut depth: i32 = 0;
 
@@ -538,7 +540,6 @@ impl Deck {
 
             let mut iterator = new_unvisited.iter();
             let mut printed = !debug;
-            let mut seen = HashSet::new();
 
             loop {
                 if let Some(wm) = iterator.next() {
@@ -571,6 +572,7 @@ impl Deck {
             }
             new_unvisited.clear();
             depth += 1;
+            seen.clear();
         }
 
         Some(-1 * depth)
