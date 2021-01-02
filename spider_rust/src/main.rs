@@ -98,19 +98,21 @@ fn play_one_round(
                 Ok(_) => println!("successfully wrote to tmp"),
             }
 
-            let filename = orig_filename.expect("filename");
-            let contents =
-                fs::read_to_string(filename).expect("Something went wrong reading the file");
-            let mut deck2 = Deck::parse(&contents);
-            deck2.replace_play_card(m.from(), m.index() - 1, &c);
-            let mut file = match File::create(filename) {
-                Err(why) => panic!("couldn't create tmp: {}", why),
-                Ok(file) => file,
-            };
+            if orig_filename.is_some() {
+                let filename = orig_filename.expect("filename");
+                let contents =
+                    fs::read_to_string(filename).expect("Something went wrong reading the file");
+                let mut deck2 = Deck::parse(&contents);
+                deck2.replace_play_card(m.from(), m.index() - 1, &c);
+                let mut file = match File::create(filename) {
+                    Err(why) => panic!("couldn't create tmp: {}", why),
+                    Ok(file) => file,
+                };
 
-            match file.write_all(deck2.to_string().as_bytes()) {
-                Err(why) => panic!("couldn't write to {} {}", filename, why),
-                Ok(_) => println!("successfully wrote to {}", filename),
+                match file.write_all(deck2.to_string().as_bytes()) {
+                    Err(why) => panic!("couldn't write to {} {}", filename, why),
+                    Ok(_) => println!("successfully wrote to {}", filename),
+                }
             }
 
             return true;
