@@ -51,12 +51,18 @@ fn generate_deck(filename: &str) {
     }
 }
 
-fn play_one_round(filename: &str, cap: usize, suits: usize, orig_filename: Option<&str>) -> bool {
+fn play_one_round(
+    filename: &str,
+    cap: usize,
+    suits: usize,
+    orig_filename: Option<&str>,
+    debug: bool,
+) -> bool {
     let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
     let mut deck = Deck::parse(&contents);
     deck.shuffle_unknowns(suits);
 
-    let result = deck.shortest_path(cap, 80_000_000);
+    let result = deck.shortest_path(cap, 80_000_000, debug);
     if result.is_none() {
         return false;
     }
@@ -142,6 +148,11 @@ fn main() {
                 .help("Number of suits"),
         )
         .arg(
+            Arg::with_name("debug")
+                .long("debug")
+                .help("Output progress"),
+        )
+        .arg(
             Arg::with_name("generate")
                 .long("generate")
                 .help("Generate a new deck file"),
@@ -157,12 +168,14 @@ fn main() {
     if let Some(ncap) = matches.value_of("cap") {
         cap = ncap.parse().expect("Integer");
     }
+
     loop {
         if !play_one_round(
             filename,
             cap,
             matches.value_of("suits").unwrap().parse().unwrap(),
             matches.value_of("orig"),
+            matches.is_present("debug"),
         ) {
             break;
         }

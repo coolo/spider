@@ -106,7 +106,7 @@ impl Card {
             Some('K') => card.set_rank(13),
             Some('X') => {
                 card.set_unknown(true);
-                match chars.next() {
+                match Card::opt_to_upper(chars.next()) {
                     Some('X') => {
                         return Some(card);
                     }
