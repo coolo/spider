@@ -207,6 +207,10 @@ impl Deck {
                 break;
             }
         }
+        // no point in looking
+        if next_talon.is_some() && self.playable() < 10 {
+            return vec;
+        }
         // can't pull the talon if it turns true
         let mut one_is_empty = false;
 
@@ -405,7 +409,7 @@ impl Deck {
         for i in 0..10 {
             result += self.play[i].playable();
         }
-        result + 13 * (self.off.count() as u32)
+        result
     }
 
     pub fn apply_move(&self, m: &Move) -> Deck {
@@ -555,6 +559,7 @@ impl Deck {
                     if seen.contains(&wm.hash) {
                         continue;
                     }
+
                     if wm.chaos == 0 {
                         self.moves = wm.deck.moves.clone();
                         self.moves_index = wm.deck.moves_index;
@@ -568,7 +573,7 @@ impl Deck {
                             wm.chaos,
                             wm.playable
                         );
-                        //println!("{}", new_unvisited[wm.deck].to_string());
+                        //println!("{}", wm.deck.to_string());
                         printed = true;
                     }
                     if unvisited[wm.talons as usize].len() < cap {
