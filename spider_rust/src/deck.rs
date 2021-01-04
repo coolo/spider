@@ -1,11 +1,11 @@
 use crate::card::Card;
-use crate::intset::Intset;
 use crate::moves::Move;
 use crate::pile::Pile;
 use seahash;
 use std::cmp::Ordering;
 use std::ptr;
 use std::rc::Rc;
+use std::collections::HashSet;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const MAX_MOVES: usize = 250;
@@ -43,6 +43,7 @@ impl PartialEq for WeightedMove {
         self.hash == other.hash
     }
 }
+
 impl Eq for WeightedMove {}
 
 // `PartialOrd` needs to be implemented as well.
@@ -448,21 +449,6 @@ impl Deck {
         newdeck
     }
 
-    fn pick_one_for_shortest_path(deck: &Deck, new_unvisited: &mut Vec<WeightedMove>) {
-        let moves = deck.get_moves();
-
-        for m in &moves {
-            let newdeck = Rc::new(deck.apply_move(m));
-            new_unvisited.push(WeightedMove {
-                chaos: newdeck.chaos(),
-                playable: newdeck.playable(),
-                talons: newdeck.talons_left(),
-                hash: newdeck.hash(),
-                deck: newdeck,
-            });
-        }
-    }
-
     pub fn full_deck(n_suits: usize) -> Vec<Card> {
         let mut cards = vec![];
         for suit in 0..4 {
@@ -528,15 +514,29 @@ impl Deck {
         unvisited[self.talons_left() as usize].push(Rc::new(self.clone()));
         // sort only the index
         let mut new_unvisited: Vec<WeightedMove> = Vec::new();
-        // worst case
-        let mut seen = Intset::new(cap * 6);
+        let mut seen = HashSet::new();
 
         let mut depth: i32 = 0;
 
         loop {
             for i in 0..=5 {
                 for deck in &unvisited[i] {
-                    Deck::pick_one_for_shortest_path(&deck, &mut new_unvisited);
+                    let moves = deck.get_moves();
+
+                    for m in &moves {
+                        let newdeck = Rc::new(deck.apply_move(m));
+                        let hash = newdeck.hash();
+                        if !seen.contains(&hash) {
+                            new_unvisited.push(WeightedMove {
+                                chaos: newdeck.chaos(),
+                                playable: newdeck.playable(),
+                                talons: newdeck.talons_left(),
+                                hash: hash,
+                                deck: newdeck,
+                            });
+                            seen.insert(hash);
+                        }
+                    }
                 }
                 unvisited[i].clear();
             }
@@ -548,18 +548,8 @@ impl Deck {
             let mut iterator = new_unvisited.iter().rev();
             let mut printed = !debug;
 
-            let mut last_chaos = 0;
-
             loop {
                 if let Some(wm) = iterator.next() {
-                    if last_chaos != wm.chaos {
-                        seen.clear();
-                        last_chaos = wm.chaos;
-                    }
-                    if seen.contains(&wm.hash) {
-                        continue;
-                    }
-
                     if wm.chaos == 0 {
                         self.moves = wm.deck.moves.clone();
                         self.moves_index = wm.deck.moves_index;
@@ -577,7 +567,6 @@ impl Deck {
                         printed = true;
                     }
                     if unvisited[wm.talons as usize].len() < cap {
-                        seen.insert(wm.hash);
                         unvisited[wm.talons as usize].push(Rc::clone(&wm.deck));
                     }
                 } else {
@@ -586,7 +575,6 @@ impl Deck {
             }
             new_unvisited.clear();
             depth += 1;
-            seen.clear();
         }
 
         Some(-1 * depth)
