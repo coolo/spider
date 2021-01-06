@@ -8,6 +8,8 @@ use clap::{App, Arg};
 use deck::Deck;
 use moves::Move;
 use pile::Pile;
+use std::cmp::Ordering;
+use std::collections::BinaryHeap;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io;
@@ -129,6 +131,33 @@ fn play_one_round(
     false
 }
 
+struct WeightedDeck {
+    deck: Deck,
+    depth: u32,
+    moves: u32,
+    total: u32,
+}
+
+impl PartialOrd for WeightedDeck {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for WeightedDeck {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other.total.cmp(&self.total)
+    }
+}
+
+impl PartialEq for WeightedDeck {
+    fn eq(&self, other: &Self) -> bool {
+        self.deck == other.deck
+    }
+}
+
+impl Eq for WeightedDeck {}
+
 fn pick_recursive(deck: &Deck, cap: usize, depth: &mut u64) -> Option<Deck> {
     let moves = deck.get_moves();
     let mut bestmove: Option<Move> = None;
@@ -136,6 +165,7 @@ fn pick_recursive(deck: &Deck, cap: usize, depth: &mut u64) -> Option<Deck> {
     for m in &moves {
         deck.explain_move(&m);
         let mut newdeck = deck.apply_move(m);
+
         let won = newdeck.shortest_path(cap, false, None);
         if won.is_none() || won.unwrap() < 0 {
             println!("Move didn't win");
@@ -161,6 +191,47 @@ fn pick_recursive(deck: &Deck, cap: usize, depth: &mut u64) -> Option<Deck> {
     } else {
         None
     }
+}
+
+fn pick(heap: &mut BinaryHeap<WeightedDeck>, cap: usize) -> bool {
+    let wdeck = heap.pop();
+    if wdeck.is_none() {
+        return false;
+    }
+    let wdeck = wdeck.unwrap();
+    let depth = wdeck.depth;
+    print!("Picked {}+{}={} (", depth, wdeck.moves, wdeck.total);
+
+    let deck = wdeck.deck;
+    let moves = deck.get_moves();
+
+    for m in &moves {
+        //deck.explain_move(&m);
+        let mut newdeck = deck.apply_move(m);
+        //println!("New\n{}", newdeck.to_string());
+        let orig_move_index = newdeck.get_moves_index();
+        let won = newdeck.shortest_path(cap, false, None);
+        newdeck.set_moves_index(orig_move_index);
+
+        if won.is_none() || won.unwrap() < 0 {
+            //println!("Move didn't win");
+        } else {
+            let won = won.unwrap() as u32;
+            //println!("Move gave {}", won);
+            print!("{} ", depth + won + 1);
+            heap.push(WeightedDeck {
+                deck: newdeck,
+                depth: depth + 1,
+                moves: won as u32,
+                total: won + depth + 1,
+            });
+        }
+    }
+    println!(")");
+    /*
+
+    */
+    true
 }
 
 fn main() {
@@ -220,11 +291,18 @@ fn main() {
     let mut deck = Deck::parse(&contents);
     deck.shuffle_unknowns(suits);
 
-    let mut depth = 0;
+    let mut heap: BinaryHeap<WeightedDeck> = BinaryHeap::new();
+    let mc = deck.shortest_path(cap, false, None).unwrap();
+    assert!(mc > 0);
+    heap.push(WeightedDeck {
+        deck: deck,
+        depth: 0,
+        moves: mc as u32,
+        total: mc as u32,
+    });
+
     loop {
-        if let Some(newdeck) = pick_recursive(&deck, cap, &mut depth) {
-            deck = newdeck;
-        } else {
+        if !pick(&mut heap, cap) {
             break;
         }
     }

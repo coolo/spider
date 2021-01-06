@@ -90,6 +90,12 @@ impl PartialOrd for WeightedMove {
     }
 }
 
+impl PartialEq for Deck {
+    fn eq(&self, other: &Self) -> bool {
+        self.hashbytes == other.hashbytes
+    }
+}
+
 impl Deck {
     pub fn hash(&self) -> u64 {
         seahash::hash(&self.hashbytes as &[u8])
@@ -286,6 +292,11 @@ impl Deck {
 
     pub fn get_moves(&self) -> Vec<Move> {
         let mut vec = Vec::new();
+
+        if self.moves_index == MAX_MOVES - 1 {
+            //println!("Too deep {}", self.to_string());
+            return vec;
+        }
 
         let mut next_talon: Option<usize> = None;
         for i in 0..5 {
@@ -532,13 +543,18 @@ impl Deck {
         result
     }
 
+    pub fn get_moves_index(&self) -> usize {
+        self.moves_index
+    }
+
+    pub fn set_moves_index(&mut self, index: usize) {
+        self.moves_index = index;
+    }
+
     pub fn apply_move(&self, m: &Move) -> Deck {
         let mut newdeck = self.clone();
         newdeck.moves[newdeck.moves_index] = *m;
         newdeck.moves_index += 1;
-        if newdeck.moves_index >= MAX_MOVES {
-            panic!("Way too deep");
-        }
 
         if m.is_talon() {
             let from_pile = m.from();
