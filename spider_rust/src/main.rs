@@ -146,7 +146,10 @@ impl PartialOrd for WeightedDeck {
 
 impl Ord for WeightedDeck {
     fn cmp(&self, other: &Self) -> Ordering {
-        other.total.cmp(&self.total)
+        other
+            .total
+            .cmp(&self.total)
+            .then(self.depth.cmp(&other.depth))
     }
 }
 
@@ -193,7 +196,7 @@ fn pick_recursive(deck: &Deck, cap: usize, depth: &mut u64) -> Option<Deck> {
     }
 }
 
-fn pick(heap: &mut BinaryHeap<WeightedDeck>, cap: usize) -> bool {
+fn pick(heap: &mut BinaryHeap<WeightedDeck>, seen: &mut HashSet<u64>, cap: usize) -> bool {
     let wdeck = heap.pop();
     if wdeck.is_none() {
         return false;
@@ -208,6 +211,11 @@ fn pick(heap: &mut BinaryHeap<WeightedDeck>, cap: usize) -> bool {
     for m in &moves {
         //deck.explain_move(&m);
         let mut newdeck = deck.apply_move(m);
+        let hash = newdeck.hash();
+        if seen.contains(&hash) {
+            continue;
+        }
+        seen.insert(hash);
         //println!("New\n{}", newdeck.to_string());
         let orig_move_index = newdeck.get_moves_index();
         let won = newdeck.shortest_path(cap, false, None);
@@ -300,9 +308,10 @@ fn main() {
         moves: mc as u32,
         total: mc as u32,
     });
+    let mut seen = HashSet::new();
 
     loop {
-        if !pick(&mut heap, cap) {
+        if !pick(&mut heap, &mut seen, cap) {
             break;
         }
     }
