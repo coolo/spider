@@ -3,9 +3,9 @@ use crate::moves::Move;
 use crate::pile::Pile;
 use seahash;
 use std::cmp::Ordering;
+use std::collections::HashSet;
 use std::ptr;
 use std::rc::Rc;
-use std::collections::HashSet;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const MAX_MOVES: usize = 250;
@@ -23,18 +23,55 @@ pub struct Deck {
 #[derive(Clone)]
 struct WeightedMove {
     deck: Rc<Deck>,
-    chaos: u32,
     talons: u32,
-    playable: u32,
     hash: u64,
+    chaos: u32,
+    in_off: u32,
+    free_plays: u32,
+    playable: u32,
+}
+
+impl WeightedMove {
+    pub fn from(deck: Rc<Deck>, hash: u64) -> Self {
+        Self {
+            talons: deck.free_talons(),
+            chaos: deck.chaos(),
+            hash: hash,
+            in_off: deck.in_off(),
+            free_plays: deck.free_plays(),
+            playable: deck.playable(),
+            deck: deck,
+        }
+    }
 }
 
 impl Ord for WeightedMove {
     fn cmp(&self, other: &Self) -> Ordering {
-        other
-            .chaos
-            .cmp(&self.chaos)
-            .then(self.playable.cmp(&other.playable))
+        let ord = other.chaos.cmp(&self.chaos);
+        if ord != Ordering::Equal {
+            return ord;
+        }
+        let ready1 = self.playable + self.in_off + self.free_plays;
+        let ready2 = other.playable + other.in_off + other.free_plays;
+        let ord = ready1.cmp(&ready2);
+        if ord != Ordering::Equal {
+            return ord;
+        }
+        if self.chaos == 0 {
+            // once we are in straight win mode, we go differently
+            let ord = self.free_plays.cmp(&other.free_plays);
+            if ord != Ordering::Equal {
+                return ord;
+            }
+            // if the number of empty plays is equal, less in the off
+            // is actually a benefit (more strongly ordered)
+            let ord = other.in_off.cmp(&self.in_off);
+            if ord != Ordering::Equal {
+                return ord;
+            }
+        }
+        // make the sorting stables
+        self.hash.cmp(&other.hash)
     }
 }
 
@@ -58,16 +95,31 @@ impl Deck {
         seahash::hash(&self.hashbytes as &[u8])
     }
 
+    #[inline]
+    pub fn in_off(&self) -> u32 {
+        (self.off.count() as u32) * 13
+    }
+
     #[allow(dead_code)]
     pub fn is_won(&self) -> bool {
         self.off.count() == 8
+    }
+
+    pub fn free_plays(&self) -> u32 {
+        let mut result = 0;
+        for i in 0..10 {
+            if self.play[i].count() == 0 {
+                result += 1;
+            }
+        }
+        result
     }
 
     pub fn reset_moves(&mut self) {
         self.moves_index = 0;
     }
 
-    pub fn talons_left(&self) -> u32 {
+    pub fn free_talons(&self) -> u32 {
         // TODO: store as property
         let mut ret = 0;
         for i in 0..5 {
@@ -143,10 +195,42 @@ impl Deck {
             }
             index += 1;
         }
+        newdeck.reorder_hashbytes();
+
         if index != 16 {
             panic!("Not all piles are parsed");
         }
         newdeck
+    }
+
+    fn reorder_hashbytes(&mut self) {
+        if self.free_talons() != 5 {
+            return;
+        }
+        // reorder the piles
+        let mut hash_indeces = [
+            self.play[0].id(),
+            self.play[1].id(),
+            self.play[2].id(),
+            self.play[3].id(),
+            self.play[4].id(),
+            self.play[5].id(),
+            self.play[6].id(),
+            self.play[7].id(),
+            self.play[8].id(),
+            self.play[9].id(),
+        ];
+        hash_indeces.sort();
+        for index in 0..10 {
+            unsafe {
+                let t = std::mem::transmute::<u32, [u8; 4]>(hash_indeces[index]);
+                ptr::copy_nonoverlapping(
+                    t.as_ptr() as *const u8,
+                    self.hashbytes.as_mut_ptr().offset((index * 3) as isize),
+                    3,
+                );
+            }
+        }
     }
 
     fn set_hashbytes(&mut self, index: usize, pile: &Rc<Pile>) {
@@ -154,6 +238,7 @@ impl Deck {
         if index == 15 {
             return;
         }
+
         unsafe {
             let t = std::mem::transmute::<u32, [u8; 4]>(pile.id());
             ptr::copy_nonoverlapping(
@@ -167,10 +252,11 @@ impl Deck {
     pub fn set_play(&mut self, index: usize, pile: Rc<Pile>) {
         self.set_hashbytes(index, &pile);
         self.play[index] = pile;
+        self.reorder_hashbytes();
     }
 
     pub fn set_talon(&mut self, index: usize, pile: Rc<Pile>) {
-        self.set_hashbytes(index + 10, &pile);
+        self.set_hashbytes(index, &pile);
         self.talon[index] = pile;
     }
 
@@ -399,8 +485,41 @@ impl Deck {
 
     pub fn chaos(&self) -> u32 {
         let mut result = 0;
+        // first sum up inner pile chaos
         for i in 0..10 {
             result += self.play[i].chaos();
+        }
+        // per non-empty pile the chaos is at minimum 1
+        // but if the pile is connected, we substract one
+        // obvious wins are chaos 0
+        for i in 0..10 {
+            if self.play[i].count() == 0 {
+                continue;
+            }
+            let c1 = self.play[i].at(0);
+            if c1.rank() == 13 {
+                result -= 1;
+                continue;
+            }
+            for j in 0..10 {
+                if j == i {
+                    continue;
+                }
+                let jpile = &self.play[j];
+                if jpile.count() == 0 {
+                    continue;
+                }
+                // we don't need the suit here
+                if c1.rank() == jpile.at(jpile.count() - 1).rank() - 1 {
+                    result -= 1;
+                    break;
+                }
+            }
+        }
+        let mut fp = self.free_plays();
+        while fp > 0 && result > 0 {
+            fp -= 1;
+            result -= 1;
         }
         result
     }
@@ -408,7 +527,7 @@ impl Deck {
     pub fn playable(&self) -> u32 {
         let mut result: u32 = 0;
         for i in 0..10 {
-            result += self.play[i].playable();
+            result += self.play[i].playable() as u32;
         }
         result
     }
@@ -509,9 +628,14 @@ impl Deck {
         }
     }
 
-    pub fn shortest_path(&mut self, cap: usize, debug: bool) -> Option<i32> {
+    pub fn shortest_path(
+        &mut self,
+        cap: usize,
+        debug: bool,
+        won_decks: Option<HashSet<u64>>,
+    ) -> Option<i32> {
         let mut unvisited: [Vec<Rc<Deck>>; 6] = Default::default();
-        unvisited[self.talons_left() as usize].push(Rc::new(self.clone()));
+        unvisited[self.free_talons() as usize].push(Rc::new(self.clone()));
         // sort only the index
         let mut new_unvisited: Vec<WeightedMove> = Vec::new();
         let mut seen = HashSet::new();
@@ -527,13 +651,7 @@ impl Deck {
                         let newdeck = Rc::new(deck.apply_move(m));
                         let hash = newdeck.hash();
                         if !seen.contains(&hash) {
-                            new_unvisited.push(WeightedMove {
-                                chaos: newdeck.chaos(),
-                                playable: newdeck.playable(),
-                                talons: newdeck.talons_left(),
-                                hash: hash,
-                                deck: newdeck,
-                            });
+                            new_unvisited.push(WeightedMove::from(newdeck, hash));
                             seen.insert(hash);
                         }
                     }
@@ -550,7 +668,7 @@ impl Deck {
 
             loop {
                 if let Some(wm) = iterator.next() {
-                    if wm.chaos == 0 {
+                    if wm.deck.is_won() {
                         self.moves = wm.deck.moves.clone();
                         self.moves_index = wm.deck.moves_index;
                         return Some(depth + 1);
@@ -560,19 +678,55 @@ impl Deck {
                             "{}/{} {} {}",
                             depth,
                             new_unvisited.len(),
-                            wm.chaos,
-                            wm.playable
+                            wm.deck.chaos(),
+                            wm.deck.playable()
                         );
                         //println!("{}", wm.deck.to_string());
                         printed = true;
                     }
                     if unvisited[wm.talons as usize].len() < cap {
                         unvisited[wm.talons as usize].push(Rc::clone(&wm.deck));
+                        if let Some(ref hashset) = won_decks {
+                            if hashset.contains(&wm.hash) {
+                                println!(
+                                    "{} Found it at {}",
+                                    depth,
+                                    unvisited[wm.talons as usize].len() - 1
+                                );
+                                if depth == 9 {
+                                    let mut count = 0;
+                                    for v in &unvisited[wm.talons as usize] {
+                                        println!(
+                                            "{} {} {} {}\n{}",
+                                            count,
+                                            v.chaos(),
+                                            v.playable() + v.in_off(),
+                                            v.hash(),
+                                            v.to_string()
+                                        );
+                                        count += 1;
+                                    }
+                                }
+                            }
+                        }
                     }
                 } else {
                     break;
                 }
             }
+            /*
+                        let mut count = 0;
+                        for v in &unvisited[5] {
+                            println!(
+                                "{} {} {}\n{}",
+                                count,
+                                v.chaos(),
+                                v.playable(),
+                                v.to_string()
+                            );
+                            count += 1;
+                        }
+            */
             new_unvisited.clear();
             depth += 1;
         }
@@ -594,6 +748,14 @@ impl Deck {
         let new = self.play[play].replace_at(index, &c);
         self.play[play] = new;
     }
+
+    // for test cases
+    #[allow(dead_code)]
+    pub fn compare(&self, other: &Deck) -> Ordering {
+        let m1 = WeightedMove::from(Rc::new(self.clone()), self.hash());
+        let m2 = WeightedMove::from(Rc::new(other.clone()), other.hash());
+        m1.cmp(&m2)
+    }
 }
 
 #[cfg(test)]
@@ -602,15 +764,15 @@ mod decktests {
 
     #[test]
     fn parse() {
-        let text = "Play0: KS QS JS TS 9S 8S 7S 6S
-Play1: |AH |4H QH JH TH 9H 8H 7H 6H 5H
-Play2: |TH |2S |JS |KS |KS QH JH 2H AH
+        let text = "Play0: KS..6S
+Play1: |AH |4H QH..5H
+Play2: |TH |2S |JS |KS |KS QH..JH 2H..AH
 Play3: |6H 3H
-Play4: |TH |2S |TS 9S 8S KH QH JH TS 9H 8H 7H 6H 5S 4S 3S 3S AS
-Play5: |9S |9H 8H 7H
-Play6: |7S |QS |KH |4H 3H 2H
-Play7: |8S |JS |7S AS 5H 4H 2S AS KH QS 6S 5S 4S 3S
-Play8: 6S 5S 4S 3H 2H AH
+Play4: |TH |2S |TS 9S..8S KH..JH TS 9H..6H 5S..3S 3S AS
+Play5: |9S |9H 8H..7H
+Play6: |7S |QS |KH |4H 3H..2H
+Play7: |8S |JS |7S AS 5H..4H 2S..AS KH QS 6S..3S
+Play8: 6S..4S 3H..AH
 Play9: 5H
 Deal0: 
 Deal1: 
@@ -823,7 +985,7 @@ Deal4:
 Off: KS KS KS KS KH KH KH KH";
         let deck = Deck::parse(&text.to_string());
         assert_eq!(deck.chaos(), 0);
-        assert_eq!(deck.playable(), 104);
+        assert_eq!(deck.playable(), 0);
     }
 
     #[test]
@@ -845,8 +1007,8 @@ Deal3:
 Deal4: 
 Off: KS KS KS KS KH KH KH";
         let deck = Deck::parse(&text.to_string());
-        assert_eq!(deck.chaos(), 16);
-        assert_eq!(deck.playable(), 104);
+        assert_eq!(deck.chaos(), 0);
+        assert_eq!(deck.playable(), 13);
     }
 
     #[test]
@@ -868,7 +1030,7 @@ Off: KS KS KS KS KH KH KH";
         Deal4: 
         Off: KS KS KS KS KH KH KH";
         let mut deck = Deck::parse(&text.to_string());
-        assert_eq!(deck.shortest_path(3400, false).expect("winnable"), 3);
+        assert_eq!(deck.shortest_path(10, false, None).expect("winnable"), 3);
     }
 
     #[test]
@@ -894,7 +1056,7 @@ Off: KS KS KS KS KH KH KH";
         Deal4: 
         Off: KS KH KH KS KS";
         let mut deck = Deck::parse(&text.to_string());
-        let res = deck.shortest_path(3400, false);
+        let res = deck.shortest_path(10, false, None);
         assert_eq!(res.expect("winnable"), 28);
     }
 
@@ -919,7 +1081,7 @@ Off: KS KS KS KS KH KH KH";
         Off: KS KH KH KS KH KS";
         let mut deck = Deck::parse(&text.to_string());
         // win in 17 moves
-        let res = deck.shortest_path(5400, false);
+        let res = deck.shortest_path(10, false, None);
         assert_eq!(res.expect("winnable"), 17);
         /*
         let win_moves = deck.win_moves();
@@ -953,7 +1115,7 @@ Off: KS KS KS KS KH KH KH";
         Deal4: 
         Off: KS";
         let mut deck = Deck::parse(&text.to_string());
-        let res = deck.shortest_path(3400, false);
+        let res = deck.shortest_path(3400, false, None);
         assert_eq!(res.expect("out of options"), -2);
     }
 
@@ -1052,5 +1214,88 @@ Deal4:
 Off: KH KS KH KS";
         let deck = Deck::parse(&text.to_string());
         assert_eq!(deck.result_of_tap(6), None);
+    }
+
+    #[test]
+    fn compare1() {
+        let text = "Play0: 3S..AS
+        Play1: JS..5S
+        Play2: 
+        Play3: KS..QS
+        Play4: 4S
+        Play5: JS..AS
+        Play6: QH..AH
+        Play7: 
+        Play8: KS..QS
+        Play9: KH
+        Deal0: 
+        Deal1: 
+        Deal2: 
+        Deal3: 
+        Deal4: 
+        Off: KS KH KS KH KH";
+        let deck1 = Deck::parse(&text.to_string());
+        let text = "Play0: 3H..AH
+        Play1: JH..5H
+        Play2: AS
+        Play3: 
+        Play4: 4H
+        Play5: 
+        Play6: QS
+        Play7: JS..2S
+        Play8: KH..QH
+        Play9: KS
+        Deal0: 
+        Deal1: 
+        Deal2: 
+        Deal3: 
+        Deal4: 
+        Off: KS KH KS KH KH KS";
+        let deck2 = Deck::parse(&text.to_string());
+        assert_eq!(
+            deck2.compare(&deck1),
+            Ordering::Less,
+            "deck1 is winnable in 5, deck2 in 6"
+        );
+    }
+
+    #[test]
+    fn compare2() {
+        let text = "Play0: QH..JH
+        Play1: 7S..2S
+        Play2: KS..QS
+        Play3: TH
+        Play4: JS..8S
+        Play5: AH
+        Play6: AS
+        Play7: 9H..6H
+        Play8: KH
+        Play9: 5H..2H
+        Deal0: 
+        Deal1: 
+        Deal2: 
+        Deal3: 
+        Deal4: 
+        Off: KS KH KH KS KS KH";
+        let _deck1 = Deck::parse(&text.to_string());
+        let text = "Play0: 
+        Play1: 7S
+        Play2: KS
+        Play3: 
+        Play4: JS..TS
+        Play5: 5S..2S
+        Play6: |AS |QS KH..AH
+        Play7: 9S..8S
+        Play8: 6S
+        Play9: 
+        Deal0: 
+        Deal1: 
+        Deal2: 
+        Deal3: 
+        Deal4: 
+        Off: KS KH KH KS KS KH";
+        let _deck2 = Deck::parse(&text.to_string());
+        // deck1 is winnable in 8, deck2 in 7 - but it's hard to see
+        //assert_eq!(deck2.compare(&deck1), Ordering::Greater);
     }
 }

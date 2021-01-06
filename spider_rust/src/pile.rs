@@ -99,7 +99,7 @@ pub struct Pile {
     cards: [u8; 104],
     count: usize,
     chaos: u32,
-    playable: u32,
+    playable: u8,
 }
 
 impl PartialEq for Pile {
@@ -198,11 +198,32 @@ impl Pile {
     }
 
     pub fn to_string(&self) -> String {
-        let mut strings = Vec::new();
+        let mut result = String::new();
+        let mut startofseq: i32 = -1;
         for i in 0..self.count {
-            strings.push(self.at(i).to_string());
+            let c = self.at(i);
+            if i > 0 {
+                let lastcard = self.at(i - 1);
+                if lastcard.faceup()
+                    && lastcard.suit() == c.suit()
+                    && lastcard.rank() == c.rank() + 1
+                {
+                    continue;
+                }
+            }
+            if startofseq != (i as i32) - 1 {
+                result.push_str("..");
+                result.push_str(&self.at(i - 1).to_string());
+            }
+            result.push(' ');
+            result.push_str(&self.at(i).to_string());
+            startofseq = i as i32;
         }
-        strings.join(" ")
+        if startofseq != (self.count as i32) - 1 {
+            result.push_str("..");
+            result.push_str(&self.at(self.count - 1).to_string());
+        }
+        result.trim_start().to_string()
     }
 
     pub fn remove_cards(&self, index: usize) -> Rc<Pile> {
@@ -259,22 +280,12 @@ impl Pile {
         let mut lastcard = Card::new(0);
         for i in 0..self.count {
             let current = self.at(i);
-            if !current.faceup() {
-                result += 3;
+            // first in stack
+            if lastcard.value() == 0 {
+                result += 1;
             } else {
-                // first in stack
-                if lastcard.value() == 0 {
-                    result += 2;
-                } else {
-                    if lastcard.rank() == current.rank() + 1 {
-                        if lastcard.suit() == current.suit() {
-                            result += 1;
-                        } else {
-                            result += 2;
-                        }
-                    } else {
-                        result += 2;
-                    }
+                if !current.is_in_sequence_to(&lastcard) {
+                    result += 1;
                 }
             }
             lastcard = current;
@@ -283,16 +294,16 @@ impl Pile {
     }
 
     #[allow(dead_code)]
-    pub fn playable(&self) -> u32 {
+    pub fn playable(&self) -> u8 {
         self.playable
     }
 
-    fn calculate_playable(&self) -> u32 {
+    fn calculate_playable(&self) -> u8 {
         /*if self.count < 1 {
             return 100;
         }*/
         if self.count < 2 {
-            return self.count as u32;
+            return self.count as u8;
         }
         let mut index = self.count - 1;
         let mut topcard = self.at(index);
@@ -306,12 +317,12 @@ impl Pile {
                 break;
             }
             if index == 0 {
-                return self.count as u32;
+                return self.count as u8;
             }
             index -= 1;
             topcard = current;
         }
-        (self.count - index - 1) as u32
+        (self.count - index - 1) as u8
     }
 
     pub fn remove_known(&self, cards: &mut Vec<Card>) {
@@ -373,8 +384,8 @@ mod piletests {
         let pile1 = Pile::parse("|AS |3S |AS |6S |3H 8S").expect("parsed");
         assert_eq!(pile1.to_string(), "|AS |3S |AS |6S |3H 8S");
 
-        let pile1 = Pile::parse("|AS |3S |AS 8S..5s").expect("parsed");
-        assert_eq!(pile1.to_string(), "|AS |3S |AS 8S 7S 6S 5S");
+        let pile1 = Pile::parse("|AS |3S |AS 4S 3S 2S 8S..5s").expect("parsed");
+        assert_eq!(pile1.to_string(), "|AS |3S |AS 4S..2S 8S..5S");
     }
 
     #[test]
@@ -393,19 +404,19 @@ mod piletests {
         let pile1 = Pile::parse("|AS |3S |AS |6S |3H 8S").expect("parsed");
         let pile2 = Pile::parse("|TS 7S 6S").expect("parsed");
         let new_pile = pile1.copy_from(&pile2, 1);
-        assert_eq!(new_pile.to_string(), "|AS |3S |AS |6S |3H 8S 7S 6S");
+        assert_eq!(new_pile.to_string(), "|AS |3S |AS |6S |3H 8S..6S");
     }
 
     #[test]
     fn chaos() {
         let pile = Pile::parse("|AS |3S |AS |6S |3H 8S").expect("parsed");
-        assert_eq!(pile.chaos(), 17);
+        assert_eq!(pile.chaos(), 6);
         let pile = Pile::parse("|TS 7S 6S").expect("parsed");
-        assert_eq!(pile.chaos(), 6);
+        assert_eq!(pile.chaos(), 2);
         let pile = Pile::parse("8S 7S 6S").expect("parsed");
-        assert_eq!(pile.chaos(), 4);
+        assert_eq!(pile.chaos(), 1);
         let pile = Pile::parse("8S 7H 6S").expect("parsed");
-        assert_eq!(pile.chaos(), 6);
+        assert_eq!(pile.chaos(), 3);
     }
 
     #[test]

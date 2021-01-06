@@ -7,6 +7,7 @@ use card::Card;
 use clap::{App, Arg};
 use deck::Deck;
 use pile::Pile;
+use std::collections::HashSet;
 use std::fs::File;
 use std::io;
 use std::io::Write;
@@ -62,14 +63,17 @@ fn play_one_round(
     let mut deck = Deck::parse(&contents);
     deck.shuffle_unknowns(suits);
 
-    let result = deck.shortest_path(cap, debug);
+    let result = deck.shortest_path(cap, debug, None);
     if result.is_none() {
+        println!("No win");
         return false;
     }
+    let mut won_decks: HashSet<u64> = HashSet::new();
     let mut mc = 0;
     let mut orig = deck.clone();
     orig.reset_moves();
     for m in deck.win_moves() {
+        won_decks.insert(orig.hash());
         if !m.is_off() {
             mc += 1;
         }
@@ -116,6 +120,10 @@ fn play_one_round(
 
             return true;
         }
+    }
+    if debug {
+        deck.reset_moves();
+        deck.shortest_path(cap, debug, Some(won_decks));
     }
     false
 }
