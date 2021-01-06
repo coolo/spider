@@ -90,12 +90,6 @@ impl PartialOrd for WeightedMove {
     }
 }
 
-impl PartialEq for Deck {
-    fn eq(&self, other: &Self) -> bool {
-        self.hashbytes == other.hashbytes
-    }
-}
-
 impl Deck {
     pub fn hash(&self) -> u64 {
         seahash::hash(&self.hashbytes as &[u8])

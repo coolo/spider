@@ -136,6 +136,7 @@ struct WeightedDeck {
     depth: u32,
     moves: u32,
     total: u32,
+    hash: u64,
 }
 
 impl PartialOrd for WeightedDeck {
@@ -155,7 +156,7 @@ impl Ord for WeightedDeck {
 
 impl PartialEq for WeightedDeck {
     fn eq(&self, other: &Self) -> bool {
-        self.deck == other.deck
+        self.hash == other.hash
     }
 }
 
@@ -206,6 +207,10 @@ fn pick(heap: &mut BinaryHeap<WeightedDeck>, seen: &mut HashSet<u64>, cap: usize
     print!("Picked {}+{}={} (", depth, wdeck.moves, wdeck.total);
 
     let deck = wdeck.deck;
+    if deck.is_won() {
+        println!("WON");
+        return false;
+    }
     let moves = deck.get_moves();
 
     for m in &moves {
@@ -229,6 +234,7 @@ fn pick(heap: &mut BinaryHeap<WeightedDeck>, seen: &mut HashSet<u64>, cap: usize
             print!("{} ", depth + won + 1);
             heap.push(WeightedDeck {
                 deck: newdeck,
+                hash: hash,
                 depth: depth + 1,
                 moves: won as u32,
                 total: won + depth + 1,
@@ -303,6 +309,7 @@ fn main() {
     let mc = deck.shortest_path(cap, false, None).unwrap();
     assert!(mc > 0);
     heap.push(WeightedDeck {
+        hash: deck.hash(),
         deck: deck,
         depth: 0,
         moves: mc as u32,
