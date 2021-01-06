@@ -693,7 +693,7 @@ impl Deck {
                                     depth,
                                     unvisited[wm.talons as usize].len() - 1
                                 );
-                                if depth == 9 {
+                                if depth == 34 {
                                     let mut count = 0;
                                     for v in &unvisited[wm.talons as usize] {
                                         println!(
