@@ -6,6 +6,7 @@ mod pile;
 use card::Card;
 use clap::{App, Arg};
 use deck::Deck;
+use moves::Move;
 use pile::Pile;
 use std::collections::HashSet;
 use std::fs::File;
@@ -128,6 +129,40 @@ fn play_one_round(
     false
 }
 
+fn pick_recursive(deck: &Deck, cap: usize, depth: &mut u64) -> Option<Deck> {
+    let moves = deck.get_moves();
+    let mut bestmove: Option<Move> = None;
+    let mut best_win = 1000;
+    for m in &moves {
+        deck.explain_move(&m);
+        let mut newdeck = deck.apply_move(m);
+        let won = newdeck.shortest_path(cap, false, None);
+        if won.is_none() || won.unwrap() < 0 {
+            println!("Move didn't win");
+        } else {
+            let won = won.unwrap();
+            println!("Move gave {}", won);
+            if won < best_win {
+                bestmove = Some(*m);
+                best_win = won;
+            }
+        }
+    }
+    if let Some(best) = bestmove {
+        deck.explain_move(&best);
+        println!(
+            "{}: {} moves (total {})",
+            depth,
+            best_win,
+            *depth + best_win as u64
+        );
+        *depth = *depth + 1;
+        Some(deck.apply_move(&best))
+    } else {
+        None
+    }
+}
+
 fn main() {
     let matches = App::new("spider")
         .version("1.0")
@@ -179,15 +214,30 @@ fn main() {
         cap = ncap.parse().expect("Integer");
     }
 
+    let suits = matches.value_of("suits").unwrap().parse().unwrap();
+
+    let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
+    let mut deck = Deck::parse(&contents);
+    deck.shuffle_unknowns(suits);
+
+    let mut depth = 0;
+    loop {
+        if let Some(newdeck) = pick_recursive(&deck, cap, &mut depth) {
+            deck = newdeck;
+        } else {
+            break;
+        }
+    }
+    /*
     loop {
         if !play_one_round(
             filename,
             cap,
-            matches.value_of("suits").unwrap().parse().unwrap(),
+            suits,
             matches.value_of("orig"),
             matches.is_present("debug"),
         ) {
             break;
         }
-    }
+    }*/
 }
