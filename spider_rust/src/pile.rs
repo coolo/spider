@@ -1,5 +1,6 @@
 use crate::card::Card;
 use once_cell::sync::Lazy;
+use std::cmp::Ordering;
 use std::mem::MaybeUninit;
 use std::rc::Rc;
 
@@ -116,6 +117,28 @@ impl PartialEq for Pile {
     }
 }
 impl Eq for Pile {}
+
+impl Ord for Pile {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let ord = self.count.cmp(&other.count);
+        if ord != Ordering::Equal {
+            return ord;
+        }
+        for i in 0..self.count {
+            let ord = self.cards[i].cmp(&other.cards[i]);
+            if ord != Ordering::Equal {
+                return ord;
+            }
+        }
+        Ordering::Equal
+    }
+}
+
+impl PartialOrd for Pile {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
 impl Pile {
     pub fn or_insert(cards: &[u8; 104], count: usize) -> Rc<Pile> {

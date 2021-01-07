@@ -70,8 +70,21 @@ impl Ord for WeightedMove {
                 return ord;
             }
         }
-        // make the sorting stable
-        self.hash.cmp(&other.hash)
+        // while it's tempting to order just by hash, this doesn't give reproducible
+        // behaviour between runs if the PileTrees differ (and as such the IDs)
+        for i in 0..5 {
+            let ord = self.deck.talon[i].cmp(&other.deck.talon[i]);
+            if ord != Ordering::Equal {
+                return ord;
+            }
+        }
+        for i in 0..10 {
+            let ord = self.deck.play[i].cmp(&other.deck.play[i]);
+            if ord != Ordering::Equal {
+                return ord;
+            }
+        }
+        Ordering::Equal
     }
 }
 
@@ -424,6 +437,7 @@ impl Deck {
         // happy casting to avoid storing every index as 64 bits
         let from_pile = &self.play[m.from()];
         let to_pile = &self.play[m.to()];
+
         let from_card = from_pile.at(m.index()).to_string();
         let mut to_card = String::from("Empty");
         if to_pile.count() > 0 {

@@ -161,7 +161,13 @@ impl PartialEq for WeightedDeck {
 
 impl Eq for WeightedDeck {}
 
-fn pick(heap: &mut BinaryHeap<WeightedDeck>, seen: &mut HashSet<u64>, cap: usize) -> usize {
+fn pick(
+    heap: &mut BinaryHeap<WeightedDeck>,
+    seen: &mut HashSet<u64>,
+    cap: usize,
+    best_before: usize,
+    orig: &Deck,
+) -> usize {
     let wdeck = heap.pop();
     if wdeck.is_none() {
         return 0;
@@ -177,6 +183,7 @@ fn pick(heap: &mut BinaryHeap<WeightedDeck>, seen: &mut HashSet<u64>, cap: usize
     }
     let moves = deck.get_moves();
     let mut best_total = deck::MAX_MOVES;
+    let mut bestdeck: Option<Deck> = None;
 
     for m in &moves {
         //deck.explain_move(&m);
@@ -189,7 +196,6 @@ fn pick(heap: &mut BinaryHeap<WeightedDeck>, seen: &mut HashSet<u64>, cap: usize
         //println!("New\n{}", newdeck.to_string());
         let orig_move_index = newdeck.get_moves_index();
         let won = newdeck.shortest_path(cap, false, None);
-        newdeck.set_moves_index(orig_move_index);
 
         if won.is_none() || won.unwrap() < 0 {
             //println!("Move didn't win");
@@ -197,6 +203,13 @@ fn pick(heap: &mut BinaryHeap<WeightedDeck>, seen: &mut HashSet<u64>, cap: usize
             let won = won.unwrap() as u32;
             //println!("Move gave {}", won);
             print!("{} ", depth + won + 1);
+            if ((won + depth + 1) as usize) < best_total {
+                best_total = (won + depth + 1) as usize;
+                if best_total < best_before {
+                    bestdeck = Some(newdeck.clone());
+                }
+            }
+            newdeck.set_moves_index(orig_move_index);
             heap.push(WeightedDeck {
                 deck: newdeck,
                 hash: hash,
@@ -204,9 +217,6 @@ fn pick(heap: &mut BinaryHeap<WeightedDeck>, seen: &mut HashSet<u64>, cap: usize
                 moves: won as u32,
                 total: won + depth + 1,
             });
-            if ((won + depth + 1) as usize) < best_total {
-                best_total = (won + depth + 1) as usize;
-            }
         }
     }
     println!(")");
@@ -221,6 +231,19 @@ fn pick(heap: &mut BinaryHeap<WeightedDeck>, seen: &mut HashSet<u64>, cap: usize
         match file.write_all(deck.to_string().as_bytes()) {
             Err(why) => panic!("couldn't write to {} {}", filename, why),
             Ok(_) => println!("successfully wrote to {}", filename),
+        }
+    }
+    if let Some(deck) = bestdeck {
+        let moves = deck.win_moves();
+        let mut deck = orig.clone();
+        let mut mc = 0;
+        for m in moves {
+            if !m.is_off() {
+                mc += 1;
+            }
+            print!("Move {}: ", mc);
+            deck.explain_move(&m);
+            deck = deck.apply_move(&m);
         }
     }
     best_total
@@ -277,7 +300,7 @@ fn main() {
         generate_deck(filename);
         return;
     }
-    let mut cap: usize = 5000;
+    let mut cap: usize = 200;
     if let Some(ncap) = matches.value_of("cap") {
         cap = ncap.parse().expect("Integer");
     }
@@ -291,20 +314,25 @@ fn main() {
     if matches.is_present("slow") {
         let mut heap: BinaryHeap<WeightedDeck> = BinaryHeap::new();
         let mc = deck.shortest_path(cap, false, None).unwrap();
+        deck.reset_moves();
         assert!(mc > 0);
         heap.push(WeightedDeck {
             hash: deck.hash(),
-            deck: deck,
+            deck: deck.clone(),
             depth: 0,
             moves: mc as u32,
             total: mc as u32,
         });
         let mut seen = HashSet::new();
+        let mut best = deck::MAX_MOVES;
 
         loop {
-            let current_best = pick(&mut heap, &mut seen, cap);
+            let current_best = pick(&mut heap, &mut seen, cap, best, &deck);
             if current_best == 0 {
                 break;
+            }
+            if best > current_best {
+                best = current_best;
             }
         }
     } else {
