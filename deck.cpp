@@ -136,35 +136,38 @@ Deck *Deck::applyMove(Move m, bool stop)
     }
     newone->order = order;
     newone->order.append(m);
-    newone->piles = piles;
+    for (Pile *p : piles)
+    {
+        newone->piles.append(new Pile(p));
+    }
     if (m.talon)
     {
         for (int to = 0; to < 10; to++)
         {
             Card c = newone->piles[m.from]->at(to);
             c.set_faceup(true);
-            newone->piles[to] = newone->piles[to]->newWithCard(c);
+            newone->piles[to]->addCard(c);
         }
         // empty pile
-        newone->piles[m.from] = Pile::createPile(0, 0);
+        newone->piles[m.from]->clear();
     }
     else if (m.off)
     {
         Card c = newone->piles[m.from]->at(newone->piles[m.from]->cardCount() - 13);
-        newone->piles[15] = newone->piles[15]->newWithCard(c);
-        newone->piles[m.from] = newone->piles[m.from]->remove(m.index);
+        newone->piles[15]->addCard(c);
+        newone->piles[m.from]->remove(m.index);
     }
     else
     {
-        newone->piles[m.to] = newone->piles[m.to]->copyFrom(newone->piles[m.from], m.index);
-        newone->piles[m.from] = newone->piles[m.from]->remove(m.index);
+        newone->piles[m.to]->copyFrom(newone->piles[m.from], m.index);
+        newone->piles[m.from]->remove(m.index);
         if (stop && m.index > 0 && newone->piles[m.from]->at(m.index - 1).is_unknown())
         {
             std::cout << "What's up?" << std::endl;
             std::string line;
             std::getline(std::cin, line);
             Card c(QString::fromStdString(line));
-            newone->piles[m.from] = newone->piles[m.from]->replaceAt(m.index - 1, c);
+            newone->piles[m.from]->replaceAt(m.index - 1, c);
             QFile file("tmp");
             file.open(QIODevice::WriteOnly);
             file.write(newone->toString().toUtf8());
@@ -202,24 +205,28 @@ QString Deck::toString() const
 
 void Deck::addPile(Card *cards, size_t count)
 {
-    piles.append(Pile::createPile(cards, count));
+    Pile *p = new Pile();
+    for (int index = 0; index < count; index++)
+        p->addCard(cards[index]);
+    piles.append(p);
 }
 
 uint64_t Deck::id()
 {
-    uint64_t ids[16];
+    // TODO: ignore off
+    uchar buffer[16 * MAX_CARDS];
     int counter = 0;
     for (Pile *p : piles)
     {
-        ids[counter++] = p->id();
+        memcpy(buffer + counter * MAX_CARDS, p->cardsPtr(), MAX_CARDS);
     }
-    return SpookyHash::Hash64(&ids, 16 * 8, 1);
+    return SpookyHash::Hash64(&buffer, 16 * MAX_CARDS, 1);
 }
 
 void Deck::assignLeftCards(QList<Card> &list)
 {
     for (int i = 0; i < 15; i++)
-        piles[i] = piles[i]->assignLeftCards(list);
+        piles[i]->assignLeftCards(list);
 }
 
 void Deck::calculateChaos()

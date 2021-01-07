@@ -4,37 +4,40 @@
 #include "card.h"
 #include <QList>
 
+const int MAX_CARDS = 104;
+
 class Pile
 {
-private:
+public:
     Pile()
     {
-        m_id = 0;
         m_chaos = 0;
         count = 0;
     }
-
-public:
-    Pile *newWithCard(const Card &c);
+    Pile(Pile *other)
+    {
+        count = other->count;
+        m_chaos = other->m_chaos;
+        memcpy(cards, other->cards, MAX_CARDS);
+    }
+    void addCard(const Card &c);
     QString toString() const;
     bool empty() const { return count == 0; }
     Card at(int index) const { return cards[index]; }
     size_t cardCount() const { return count; }
-    Pile *remove(int index);
-    Pile *copyFrom(Pile *from, int index);
-    Pile *replaceAt(int index, const Card &c);
+    void remove(int index);
+    void copyFrom(Pile *from, int index);
+    void replaceAt(int index, const Card &c);
     int chaos() const { return m_chaos; }
-    uint64_t id() const { return m_id; }
-    static Pile *createPile(Card *cards, size_t count);
-    Pile *assignLeftCards(QList<Card> &list);
+    void assignLeftCards(QList<Card> &list);
+    void clear();
+    const unsigned char *cardsPtr() const { return (const unsigned char *)cards; };
 
 private:
     void calculateChaos();
     int m_chaos;
-    uint64_t m_id;
-    Card cards[104];
+    Card cards[MAX_CARDS];
     size_t count;
-    static QMap<uint64_t, Pile *> seen;
 };
 
 #endif
