@@ -31,23 +31,79 @@ enum Rank
 
 struct Card
 {
-    bool faceup;
-    bool unknown;
-    Suit suit;
-    Rank rank;
+    // 4 bits rank
+    // 2 bits suit
+    // 1 bit faceup
+    // 1 bit unknown
+    uchar value;
 
     Card()
     {
-        faceup = false;
-        rank = None;
-        unknown = true;
+        value = 0;
     }
+
+    inline bool is_faceup() const
+    {
+        return (value & (1 << 6)) > 0;
+    }
+
+    void set_faceup(bool face)
+    {
+        if (face)
+        {
+            value = value | (1 << 6);
+        }
+        else
+        {
+            value = value & !(1 << 6);
+        }
+    }
+
+    inline bool is_unknown() const
+    {
+        return (value & (1 << 7)) > 0;
+    }
+
+    void set_unknown(bool unknown)
+    {
+        if (unknown)
+        {
+            value = value | (1 << 7);
+        }
+        else
+        {
+            value = value & ~(1 << 7);
+        }
+    }
+
+    inline Rank rank() const
+    {
+        return Rank(value & 15);
+    }
+
+    void set_rank(Rank rank)
+    {
+        value = (value & ~15) + rank;
+    }
+
+    inline Suit suit() const
+    {
+        return Suit((value >> 4) & 3);
+    }
+
+    void set_suit(Suit suit)
+    {
+        Rank _rank = rank();
+        value = value >> 4;
+        value = (value & ~3) + suit;
+        value = (value << 4) + _rank;
+    }
+
     Card(QString token);
     QString toString() const;
     Suit char2suit(char c);
     Rank char2rank(char c);
-    // 4 bits for rank, 2 bits for suit, 1 bit for faceup
-    unsigned char asByte() { return rank + (suit << 4) + (faceup << 6); }
+    unsigned char raw_value() { return value; }
     bool operator==(const Card &rhs) const;
 };
 

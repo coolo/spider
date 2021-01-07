@@ -33,19 +33,19 @@ QList<Move> Deck::getMoves()
         }
 
         int index = piles[from]->cardCount() - 1;
-        Suit top_suit = piles[from]->at(index).suit;
-        int top_rank = int(piles[from]->at(index).rank) - 1;
+        Suit top_suit = piles[from]->at(index).suit();
+        int top_rank = int(piles[from]->at(index).rank()) - 1;
 
         while (index >= 0)
         {
             Card current = piles[from]->at(index);
-            if (!current.faceup)
+            if (!current.is_faceup())
                 break;
-            if (current.suit != top_suit)
+            if (current.suit() != top_suit)
                 break;
-            if (top_rank + 1 != current.rank)
+            if (top_rank + 1 != current.rank())
                 break;
-            top_rank = piles[from]->at(index).rank;
+            top_rank = piles[from]->at(index).rank();
 
             if (piles[from]->cardCount() - index == 13)
             {
@@ -67,7 +67,7 @@ QList<Move> Deck::getMoves()
                 if (to_count > 0)
                 {
                     Card top_card = piles[to]->at(to_count - 1);
-                    if (top_card.rank != top_rank + 1)
+                    if (top_card.rank() != top_rank + 1)
                         continue;
                 }
                 else if (moved_to_empty)
@@ -142,7 +142,7 @@ Deck *Deck::applyMove(Move m, bool stop)
         for (int to = 0; to < 10; to++)
         {
             Card c = newone->piles[m.from]->at(to);
-            c.faceup = true;
+            c.set_faceup(true);
             newone->piles[to] = newone->piles[to]->newWithCard(c);
         }
         // empty pile
@@ -158,7 +158,7 @@ Deck *Deck::applyMove(Move m, bool stop)
     {
         newone->piles[m.to] = newone->piles[m.to]->copyFrom(newone->piles[m.from], m.index);
         newone->piles[m.from] = newone->piles[m.from]->remove(m.index);
-        if (stop && m.index > 0 && newone->piles[m.from]->at(m.index - 1).unknown)
+        if (stop && m.index > 0 && newone->piles[m.from]->at(m.index - 1).is_unknown())
         {
             std::cout << "What's up?" << std::endl;
             std::string line;

@@ -11,7 +11,7 @@ Pile *Pile::createPile(Card *newcards, size_t newcount)
     int index = 0;
     for (int i = 0; i < newcount; i++)
     {
-        bytes[index++] = newcards[i].asByte();
+        bytes[index++] = newcards[i].raw_value();
     }
     uint64_t id = SpookyHash::Hash64(bytes, index, 1);
     QMap<uint64_t, Pile *>::iterator seen_one = seen.find(id);
@@ -59,7 +59,7 @@ Pile *Pile::remove(int index)
         newcount--;
     if (index > 0)
     {
-        newcards[index - 1].faceup = true;
+        newcards[index - 1].set_faceup(true);
     }
     return createPile(newcards, newcount);
 }
@@ -81,17 +81,17 @@ void Pile::calculateChaos()
     while (--index >= 0)
     {
         Card c = cards[index];
-        if (!c.faceup)
+        if (!c.is_faceup())
         {
             m_chaos += 2;
         }
-        else if (prev_card.rank != None)
+        else if (prev_card.rank() != None)
         {
-            if (c.suit == prev_card.suit && c.rank == prev_card.rank + 1)
+            if (c.suit() == prev_card.suit() && c.rank() == prev_card.rank() + 1)
                 m_chaos += 0;
             else
             {
-                if (c.rank < prev_card.rank)
+                if (c.rank() < prev_card.rank())
                     m_chaos += 2;
                 else
                     m_chaos += 1;
@@ -113,10 +113,10 @@ Pile *Pile::assignLeftCards(QList<Card> &list)
     memcpy(newcards, cards, sizeof(Card) * count);
     for (int index = 0; index < count; index++)
     {
-        if (cards[index].rank == None)
+        if (cards[index].rank() == None)
         {
             Card c = list.takeFirst();
-            c.faceup = newcards[index].faceup;
+            c.set_faceup(newcards[index].is_faceup());
             newcards[index] = c;
             taken = true;
         }

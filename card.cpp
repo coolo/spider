@@ -4,13 +4,13 @@
 
 QString Card::toString() const
 {
-    if (unknown && faceup)
+    if (is_unknown() && is_faceup())
         return "XX";
-    if (unknown)
-       return "|XX";
+    if (is_unknown())
+        return "|XX";
 
     QString ret;
-    switch (rank)
+    switch (rank())
     {
     case Ace:
         ret += 'A';
@@ -31,14 +31,15 @@ QString Card::toString() const
         ret += 'N';
         break;
     default:
-        if (rank < 2 || rank > 9) {
+        if (rank() < 2 || rank() > 9)
+        {
             qFatal("rank is out of range");
             exit(1);
         }
-        ret += ('0' + rank);
+        ret += ('0' + rank());
         break;
     }
-    switch (suit)
+    switch (suit())
     {
     case Spades:
         ret += "S";
@@ -53,10 +54,10 @@ QString Card::toString() const
         ret += "C";
         break;
     default:
-        qDebug() << "Invalid suit " << suit;
+        qDebug() << "Invalid suit " << suit();
         exit(1);
     }
-    if (!faceup)
+    if (!is_faceup())
         ret = "|" + ret;
     return ret;
 }
@@ -117,23 +118,27 @@ Rank Card::char2rank(char c)
 
 Card::Card(QString token)
 {
-    faceup = !token.startsWith('|');
-    if (!faceup)
+    value = 0;
+    set_faceup(!token.startsWith('|'));
+    if (!is_faceup())
     {
         token.remove(0, 1);
     }
-    if (token == "XX") {
-      rank = None;
-      suit = Spades;
-      unknown = true;
-      return;
+    if (token == "XX")
+    {
+        set_rank(None);
+        set_suit(Spades);
+        set_unknown(true);
+        return;
     }
-    unknown = false;
-    rank = char2rank(token[0].toLatin1());
-    suit = char2suit(token[1].toLatin1());
+
+    set_rank(char2rank(token[0].toLatin1()));
+    set_suit(char2suit(token[1].toLatin1()));
+    set_unknown(false);
 }
 
-bool Card::operator==(const Card &rhs) const {
-   return suit == rhs.suit && rank == rhs.rank;
+// to remove known cards from partly unknown decks. We don't care for faceup and unknown
+bool Card::operator==(const Card &rhs) const
+{
+    return suit() == rhs.suit() && rank() == rhs.rank();
 }
-
