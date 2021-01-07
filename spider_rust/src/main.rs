@@ -161,10 +161,10 @@ impl PartialEq for WeightedDeck {
 
 impl Eq for WeightedDeck {}
 
-fn pick(heap: &mut BinaryHeap<WeightedDeck>, seen: &mut HashSet<u64>, cap: usize) -> bool {
+fn pick(heap: &mut BinaryHeap<WeightedDeck>, seen: &mut HashSet<u64>, cap: usize) -> usize {
     let wdeck = heap.pop();
     if wdeck.is_none() {
-        return false;
+        return 0;
     }
     let wdeck = wdeck.unwrap();
     let depth = wdeck.depth;
@@ -173,9 +173,10 @@ fn pick(heap: &mut BinaryHeap<WeightedDeck>, seen: &mut HashSet<u64>, cap: usize
     let deck = wdeck.deck;
     if deck.is_won() {
         println!("WON");
-        return false;
+        return 0;
     }
     let moves = deck.get_moves();
+    let mut best_total = deck::MAX_MOVES;
 
     for m in &moves {
         //deck.explain_move(&m);
@@ -203,10 +204,26 @@ fn pick(heap: &mut BinaryHeap<WeightedDeck>, seen: &mut HashSet<u64>, cap: usize
                 moves: won as u32,
                 total: won + depth + 1,
             });
+            if ((won + depth + 1) as usize) < best_total {
+                best_total = (won + depth + 1) as usize;
+            }
         }
     }
     println!(")");
-    true
+    if best_total > wdeck.total as usize {
+        println!("There was a slip!");
+        let filename = format!("slip.{}-{}", best_total, wdeck.total);
+        let mut file = match File::create(&filename) {
+            Err(why) => panic!("couldn't create tmp: {}", why),
+            Ok(file) => file,
+        };
+
+        match file.write_all(deck.to_string().as_bytes()) {
+            Err(why) => panic!("couldn't write to {} {}", filename, why),
+            Ok(_) => println!("successfully wrote to {}", filename),
+        }
+    }
+    best_total
 }
 
 fn main() {
@@ -285,7 +302,8 @@ fn main() {
         let mut seen = HashSet::new();
 
         loop {
-            if !pick(&mut heap, &mut seen, cap) {
+            let current_best = pick(&mut heap, &mut seen, cap);
+            if current_best == 0 {
                 break;
             }
         }

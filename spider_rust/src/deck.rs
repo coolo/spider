@@ -8,7 +8,7 @@ use std::ptr;
 use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const MAX_MOVES: usize = 250;
+pub const MAX_MOVES: usize = 250;
 
 #[derive(Clone)]
 pub struct Deck {
@@ -70,7 +70,7 @@ impl Ord for WeightedMove {
                 return ord;
             }
         }
-        // make the sorting stables
+        // make the sorting stable
         self.hash.cmp(&other.hash)
     }
 }
