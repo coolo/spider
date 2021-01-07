@@ -44,8 +44,7 @@ int main(int argc, char **argv)
         return 1;
 
     QTextStream ts(&file);
-    Deck *d = new Deck();
-    Card cards[104];
+    Deck d;
     QList<Card> required;
     int game_type = 2;
     for (int suit = 0; suit < 4; suit++)
@@ -66,7 +65,7 @@ int main(int argc, char **argv)
             required.append(c);
         }
     }
-    int count = -1;
+    int piles = -1;
     while (!ts.atEnd())
     {
         QString token;
@@ -79,9 +78,7 @@ int main(int argc, char **argv)
 
         if (token.startsWith("Play") || token.startsWith("Deal") || token.startsWith("Off"))
         {
-            if (count >= 0)
-                d->addPile(cards, count);
-            count = 0;
+            piles++;
         }
         else if (!token.isEmpty())
         {
@@ -95,14 +92,14 @@ int main(int argc, char **argv)
                 {
                     assert(required.contains(first));
                     required.removeOne(first);
-                    cards[count++] = first;
+                    d.addCard(piles, first);
                     first.set_rank(Rank(first.rank() - 1));
                 }
             }
             else
             {
                 Card c(token);
-                if (d->pilesAdded() == 15)
+                if (piles == 15)
                 {
                     for (int rank = Ace; rank <= King; rank++)
                     {
@@ -123,7 +120,7 @@ int main(int argc, char **argv)
                     }
                     required.removeOne(c);
                 }
-                cards[count++] = c;
+                d.addCard(piles, c);
             }
         }
     }
@@ -136,8 +133,7 @@ int main(int argc, char **argv)
     // take this with standard seed
     std::random_shuffle(required.begin(), required.end());
     srand(time(0));
-    d->addPile(cards, count);
-    d->assignLeftCards(required);
+    d.assignLeftCards(required);
     if (!required.empty())
     {
         for (int i = 0; i < required.size(); i++)
@@ -145,19 +141,7 @@ int main(int argc, char **argv)
         qDebug() << "Required left:" << required;
     }
     Q_ASSERT(required.empty());
-    d->calculateChaos();
-    std::cout << d->toString().toStdString() << std::endl;
-    Deck orig = *d;
-    DeckList lists[6];
-    QMap<uint64_t, int> seen;
-
-    QList<Move> moves = d->getMoves();
-    for (Move m : moves)
-    {
-        std::cout << d->explainMove(m).toStdString() << std::endl;
-        Deck *newdeck = d->applyMove(m);
-        std::cout << newdeck->toString().toStdString() << std::endl;
-    }
-
+    d.calculateChaos();
+    qDebug() << d.shortestPath(200, false);
     return 0;
 }

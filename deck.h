@@ -14,7 +14,7 @@ public:
         m_chaos = -17;
         m_moves = 0;
     }
-    void addPile(Card *cards, size_t count);
+    Deck(const Deck &other);
     QList<Move> getMoves();
     QString toString() const;
     QString explainMove(Move m);
@@ -26,10 +26,14 @@ public:
     void calculateChaos();
     QList<Move> order;
     void assignLeftCards(QList<Card> &list);
-    int pilesAdded() const { return piles.size(); }
+    int shortestPath(int cap, bool debug);
+    int free_talons() const;
+    void addCard(int index, const Card &c);
 
 private:
-    QList<Pile *> piles;
+    Pile play[10];
+    Pile talon[5];
+    Pile off;
 
     int m_moves;
     int m_chaos;

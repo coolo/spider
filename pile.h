@@ -8,6 +8,9 @@ const int MAX_CARDS = 104;
 
 class Pile
 {
+private:
+    Pile(const Pile &);
+
 public:
     Pile()
     {
@@ -26,11 +29,12 @@ public:
     Card at(int index) const { return cards[index]; }
     size_t cardCount() const { return count; }
     void remove(int index);
-    void copyFrom(Pile *from, int index);
+    void copyFrom(const Pile &from, int index);
     void replaceAt(int index, const Card &c);
     int chaos() const { return m_chaos; }
     void assignLeftCards(QList<Card> &list);
     void clear();
+    void clone(const Pile &rhs);
     const unsigned char *cardsPtr() const { return (const unsigned char *)cards; };
 
 private:

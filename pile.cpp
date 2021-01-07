@@ -3,11 +3,11 @@
 #include <QDebug>
 #include <QMap>
 
-void Pile::copyFrom(Pile *from, int index)
+void Pile::copyFrom(const Pile &from, int index)
 {
-    for (int i = index; i < from->cardCount(); i++)
+    for (int i = index; i < from.cardCount(); i++)
     {
-        cards[count++] = from->at(i);
+        cards[count++] = from.at(i);
     }
 }
 
@@ -97,4 +97,11 @@ void Pile::assignLeftCards(QList<Card> &list)
 void Pile::replaceAt(int index, const Card &c)
 {
     cards[index] = c;
+}
+
+void Pile::clone(const Pile &rhs)
+{
+    m_chaos = rhs.m_chaos;
+    count = rhs.count;
+    memcpy(cards, rhs.cards, MAX_CARDS);
 }
