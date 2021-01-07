@@ -19,16 +19,18 @@ public:
     QString toString() const;
     QString explainMove(Move m);
     Deck *applyMove(Move m, bool stop = false);
-    uint64_t id();
+    uint64_t id() const;
     int chaos() const { return m_chaos; }
     int moves() const { return m_moves; }
-    int leftTalons() const { return m_talons; }
+    int leftTalons() const;
     void calculateChaos();
     QList<Move> order;
     void assignLeftCards(QList<Card> &list);
     int shortestPath(int cap, bool debug);
     int free_talons() const;
     void addCard(int index, const Card &c);
+    bool operator<(const Deck &rhs) const;
+    bool is_won() const;
 
 private:
     Pile play[10];
@@ -37,7 +39,6 @@ private:
 
     int m_moves;
     int m_chaos;
-    int m_talons;
 };
 
 #endif

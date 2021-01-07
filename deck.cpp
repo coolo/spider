@@ -26,7 +26,7 @@ QList<Move> Deck::getMoves()
     for (; from < 10; from++)
     {
         //qDebug() << "Play" << piles[from]->toString();
-        if (talon[from].empty())
+        if (play[from].empty())
         {
             one_is_empty = true;
             continue;
@@ -88,9 +88,9 @@ QList<Move> Deck::getMoves()
             index--;
         }
     }
+
     if (!one_is_empty)
     {
-
         from = 0;
         for (; from < 5; from++)
         {
@@ -103,8 +103,6 @@ QList<Move> Deck::getMoves()
             }
         }
     }
-    //qDebug() << ret.size() << "moves are possible";
-    //std::cerr << toString().toStdString() << std::endl;
     return ret;
 }
 
@@ -147,7 +145,6 @@ Deck *Deck::applyMove(Move m, bool stop)
         //qDebug() << newone->m_moves;
     }
     newone->order.append(m);
-    qDebug() << m.talon;
     if (m.talon)
     {
 
@@ -185,15 +182,12 @@ Deck *Deck::applyMove(Move m, bool stop)
         }
     }
     newone->calculateChaos();
-    std::cout << newone->toString().toStdString() << std::endl;
-
     return newone;
 }
 
 QString Deck::toString() const
 {
     QString ret;
-    qDebug() << m_chaos;
     int counter = 0;
     for (int i = 0; i < 10; i++)
     {
@@ -217,16 +211,16 @@ QString Deck::toString() const
     return ret;
 }
 
-uint64_t Deck::id()
+uint64_t Deck::id() const
 {
     // TODO: ignore off
-    uchar buffer[16 * MAX_CARDS];
+    uchar buffer[15 * MAX_CARDS];
     for (int i = 0; i < 10; i++)
         memcpy(buffer + i * MAX_CARDS, play[i].cardsPtr(), MAX_CARDS);
     for (int i = 0; i < 5; i++)
         memcpy(buffer + (i + 10) * MAX_CARDS, talon[i].cardsPtr(), MAX_CARDS);
 
-    return SpookyHash::Hash64(&buffer, 16 * MAX_CARDS, 1);
+    return SpookyHash::Hash64(&buffer, 15 * MAX_CARDS, 1);
 }
 
 void Deck::assignLeftCards(QList<Card> &list)
@@ -253,7 +247,6 @@ int Deck::free_talons() const
 void Deck::calculateChaos()
 {
     m_chaos = 0;
-    m_talons = 0;
     for (int i = 0; i < 10; i++)
     {
         m_chaos += play[i].chaos();
@@ -262,10 +255,23 @@ void Deck::calculateChaos()
     {
         if (!talon[i].empty())
         {
-            m_talons++;
             m_chaos += 11;
         }
     }
+}
+
+int Deck::leftTalons() const
+{
+    int talons = 0;
+
+    for (int i = 0; i < 5; i++)
+    {
+        if (!talon[i].empty())
+        {
+            talons++;
+        }
+    }
+    return talons;
 }
 
 int Deck::shortestPath(int cap, bool debug)
@@ -283,11 +289,11 @@ int Deck::shortestPath(int cap, bool debug)
         {
             for (auto deck = unvisited[i].begin(); deck != unvisited[i].end(); deck++)
             {
-                std::cout << deck->toString().toStdString() << std::endl;
+                //std::cout << deck->toString().toStdString() << std::endl;
                 QList<Move> moves = deck->getMoves();
                 for (Move m : moves)
                 {
-                    std::cout << deck->explainMove(m).toStdString() << std::endl;
+                    //std::cout << deck->explainMove(m).toStdString() << std::endl;
                     Deck *newdeck = deck->applyMove(m);
                     uint64_t hash = newdeck->id();
                     if (!seen.contains(hash))
@@ -300,48 +306,29 @@ int Deck::shortestPath(int cap, bool debug)
             }
             unvisited[i].clear();
         }
-        qDebug() << "NU" << new_unvisited.length();
+        qDebug() << "DEPTH" << depth << new_unvisited.length();
         if (new_unvisited.empty())
             break;
-        /*       
 
-            for i in 0..=5 {
-                for deck in &unvisited[i] {
-                    let moves = deck.get_moves();
+        std::sort(new_unvisited.begin(), new_unvisited.end());
+        QVector<Deck>::const_reverse_iterator it = new_unvisited.crbegin();
+        for (; it != new_unvisited.crend(); ++it)
+        {
 
-                    for m in &moves {
-                        let newdeck = Rc::new(deck.apply_move(m));
-                        let hash = newdeck.hash();
-                        if !seen.contains(&hash) {
-                            new_unvisited.push(WeightedMove::from(newdeck, hash));
-                            seen.insert(hash);
-                        }
-                    }
-                }
+            if (it->is_won())
+            {
+                qDebug() << "WIN";
+                return depth;
             }
-          
-            new_unvisited.sort_unstable();
-
-            let mut iterator = new_unvisited.iter().rev();
-
-            loop {
-                if let Some(wm) = iterator.next() {
-                    if wm.deck.is_won() {
-                        self.moves = wm.deck.moves.clone();
-                        self.moves_index = wm.deck.moves_index;
-                        return Some(depth + 1);
-                    }
-                    if unvisited[wm.talons as usize].len() < cap {
-                        unvisited[wm.talons as usize].push(Rc::clone(&wm.deck));
-                    }
-                } else {
-                    break;
-                }
+            int lt = it->leftTalons();
+            if (unvisited[lt].length() < cap)
+            {
+                unvisited[lt].append(*it);
             }
-            new_unvisited.clear();
-            depth += 1;
         }
-*/
+
+        new_unvisited.clear();
+        depth += 1;
     }
     return -1 * depth;
 }
@@ -356,4 +343,14 @@ void Deck::addCard(int index, const Card &c)
     {
         talon[index - 10].addCard(c);
     }
+}
+
+bool Deck::operator<(const Deck &rhs) const
+{
+    return false;
+}
+
+bool Deck::is_won() const
+{
+    return off.cardCount() == 8;
 }
