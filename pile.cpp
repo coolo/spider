@@ -126,3 +126,13 @@ int Pile::sequenceOf(Suit suit) const
     }
     return cardCount() - index;
 }
+
+int Pile::playableCards() const
+{
+    if (count < 2)
+    {
+        return count;
+    }
+    Card top_card = at(count - 1);
+    return sequenceOf(top_card.suit());
+}

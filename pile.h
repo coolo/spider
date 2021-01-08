@@ -14,7 +14,7 @@ private:
 public:
     Pile()
     {
-             count = 0;
+        count = 0;
     }
     Pile(Pile *other)
     {
@@ -35,6 +35,7 @@ public:
     void clone(const Pile &rhs);
     const unsigned char *cardsPtr() const { return (const unsigned char *)cards; };
     int sequenceOf(Suit suit) const;
+    int playableCards() const;
 
 private:
     Card cards[MAX_CARDS];

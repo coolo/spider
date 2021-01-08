@@ -23,10 +23,12 @@ public:
     QList<Move> order;
     void assignLeftCards(QList<Card> &list);
     int shortestPath(int cap, bool debug);
-    int free_talons() const;
     void addCard(int index, const Card &c);
     bool operator<(const Deck &rhs) const;
-    bool is_won() const;
+    bool isWon() const;
+    int playableCards() const;
+    int inOff() const;
+    int freePlays() const;
 
 private:
     Pile play[10];

@@ -237,7 +237,7 @@ void Deck::assignLeftCards(QList<Card> &list)
         talon[i].assignLeftCards(list);
 }
 
-int Deck::free_talons() const
+int Deck::leftTalons() const
 {
     int talons = 0;
     for (int i = 0; i < 5; i++)
@@ -267,26 +267,12 @@ int Deck::chaos() const
     return chaos;
 }
 
-int Deck::leftTalons() const
-{
-    int talons = 0;
-
-    for (int i = 0; i < 5; i++)
-    {
-        if (!talon[i].empty())
-        {
-            talons++;
-        }
-    }
-    return talons;
-}
-
 int Deck::shortestPath(int cap, bool debug)
 {
     int depth = 1;
 
     QVector<Deck> unvisited[6];
-    unvisited[free_talons()].append(Deck(*this));
+    unvisited[leftTalons()].append(Deck(*this));
     QSet<uint64_t> seen;
     QVector<Deck> new_unvisited;
 
@@ -309,6 +295,7 @@ int Deck::shortestPath(int cap, bool debug)
                         seen.insert(hash);
                     }
                     delete newdeck;
+                    newdeck = 0;
                 }
             }
             unvisited[i].clear();
@@ -327,7 +314,7 @@ int Deck::shortestPath(int cap, bool debug)
                 if (depth != 1)
                     printed = true;
             }
-            if (it->is_won())
+            if (it->isWon())
             {
                 order = it->order;
                 return depth;
@@ -357,6 +344,32 @@ void Deck::addCard(int index, const Card &c)
     }
 }
 
+int Deck::playableCards() const
+{
+    int result = 0;
+    for (int i = 0; i < 10; i++)
+        result += play[i].playableCards();
+    return result;
+}
+
+int Deck::inOff() const
+{
+    return off.cardCount() * 13;
+}
+
+int Deck::freePlays() const
+{
+    int result = 0;
+    for (int i = 0; i < 10; i++)
+    {
+        if (play[i].empty())
+        {
+            result++;
+        }
+    }
+    return result;
+}
+
 bool Deck::operator<(const Deck &rhs) const
 {
     int chaos1 = chaos();
@@ -365,18 +378,14 @@ bool Deck::operator<(const Deck &rhs) const
     {
         return chaos1 < chaos2;
     }
+    int ready1 = playableCards() + inOff() + freePlays();
+    int ready2 = rhs.playableCards() + rhs.inOff() + rhs.freePlays();
+    if (ready1 != ready2)
+    {
+        return ready1 < ready2;
+    }
     return false;
     /*
-     let ord = other.chaos.cmp(&self.chaos);
-        if ord != Ordering::Equal {
-            return ord;
-        }
-        let ready1 = self.playable + self.in_off + self.free_plays;
-        let ready2 = other.playable + other.in_off + other.free_plays;
-        let ord = ready1.cmp(&ready2);
-        if ord != Ordering::Equal {
-            return ord;
-        }
         if self.chaos == 0 {
             // once we are in straight win mode, we go differently
             let ord = self.free_plays.cmp(&other.free_plays);
@@ -408,7 +417,7 @@ bool Deck::operator<(const Deck &rhs) const
     }*/
 }
 
-bool Deck::is_won() const
+bool Deck::isWon() const
 {
     return off.cardCount() == 8;
 }
