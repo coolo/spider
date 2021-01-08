@@ -6,21 +6,24 @@
 #include <QList>
 #include <QString>
 
+const int MAX_MOVES = 230;
+
 class Deck
 {
 public:
     Deck()
     {
+        moves_index = 0;
     }
     Deck(const Deck &other);
-    QList<Move> getMoves();
+    QList<Move> getMoves() const;
+    QVector<Move> getWinMoves() const;
     QString toString() const;
     QString explainMove(Move m);
     Deck *applyMove(Move m, bool stop = false);
     uint64_t id() const;
     int leftTalons() const;
     int chaos() const;
-    QList<Move> order;
     void assignLeftCards(QList<Card> &list);
     int shortestPath(int cap, bool debug);
     void addCard(int index, const Card &c);
@@ -34,6 +37,8 @@ private:
     Pile play[10];
     Pile talon[5];
     Pile off;
+    Move moves[MAX_MOVES];
+    int moves_index;
 };
 
 #endif

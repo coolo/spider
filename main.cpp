@@ -136,7 +136,7 @@ int main(int argc, char **argv)
         int counter = 1;
 
         Deck orig = d;
-        for (Move m : d.order)
+        for (Move m : d.getWinMoves())
         {
             //std::cout << orig.toString().toStdString() << std::endl;
             if (!m.off)

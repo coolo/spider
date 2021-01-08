@@ -8,8 +8,13 @@
 #include <QDebug>
 #include <iostream>
 
-QList<Move> Deck::getMoves()
+QList<Move> Deck::getMoves() const
 {
+    QList<Move> ret;
+    if (moves_index >= MAX_MOVES - 1)
+    {
+        return ret;
+    }
     int next_talon = -1;
     for (int i = 0; i < 5; i++)
     {
@@ -20,7 +25,6 @@ QList<Move> Deck::getMoves()
         }
     }
 
-    QList<Move> ret;
     int from = 0;
     bool one_is_empty = false;
     for (; from < 10; from++)
@@ -123,12 +127,23 @@ QList<Move> Deck::getMoves()
 
 Deck::Deck(const Deck &other)
 {
-    order = other.order;
+    memcpy(moves, other.moves, sizeof(Move) * MAX_MOVES);
+    moves_index = other.moves_index;
     for (int i = 0; i < 10; i++)
         play[i].clone(other.play[i]);
     for (int i = 0; i < 5; i++)
         talon[i].clone(other.talon[i]);
     off.clone(other.off);
+}
+
+QVector<Move> Deck::getWinMoves() const
+{
+    QVector<Move> res;
+    for (int i = 0; i < moves_index; i++)
+    {
+        res.append(moves[i]);
+    }
+    return res;
 }
 
 QString Deck::explainMove(Move m)
@@ -151,7 +166,7 @@ QString Deck::explainMove(Move m)
 Deck *Deck::applyMove(Move m, bool stop)
 {
     Deck *newone = new Deck(*this);
-    newone->order.append(m);
+    newone->moves[newone->moves_index++] = m;
     if (m.talon)
     {
 
@@ -316,7 +331,7 @@ int Deck::shortestPath(int cap, bool debug)
             }
             if (it->isWon())
             {
-                order = it->order;
+                memcpy(moves, it->moves, sizeof(Move) * MAX_MOVES);
                 return depth;
             }
             int lt = it->leftTalons();
