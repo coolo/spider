@@ -27,7 +27,6 @@ public:
     void assignLeftCards(QList<Card> &list);
     int shortestPath(int cap, bool debug);
     void addCard(int index, const Card &c);
-    bool operator<(const Deck &rhs) const;
     bool isWon() const;
     int playableCards() const;
     int inOff() const;

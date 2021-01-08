@@ -8,6 +8,72 @@
 #include <QDebug>
 #include <iostream>
 
+struct WeightedDeck
+{
+    WeightedDeck(Deck *d, uint64 hash);
+    uchar left_talons;
+    int chaos;
+    int64_t id;
+    uchar in_off;
+    uchar free_plays;
+    uchar playable;
+    Deck *deck;
+
+    bool operator<(const WeightedDeck &rhs) const;
+};
+
+WeightedDeck::WeightedDeck(Deck *d, uint64_t hash)
+{
+    deck = d;
+    left_talons = d->leftTalons();
+    id = hash;
+    in_off = d->inOff();
+    free_plays = d->freePlays();
+    playable = d->playableCards();
+    chaos = d->chaos();
+}
+
+// smaller is better!
+bool WeightedDeck::operator<(const WeightedDeck &rhs) const
+{
+    if (chaos != rhs.chaos)
+    {
+        // smaller chaos is better
+        return chaos < rhs.chaos;
+    }
+    int ready1 = playable + in_off + free_plays;
+    int ready2 = rhs.playable + rhs.in_off + rhs.free_plays;
+    if (ready1 != ready2)
+    {
+        // larger values are better
+        return ready1 > ready2;
+    }
+
+    // once we are in straight win mode, we go differently
+    if (chaos == 0)
+    {
+        int free1 = free_plays;
+        int free2 = rhs.free_plays;
+
+        if (free1 != free2)
+        {
+            // more free is better
+            return free1 > free2;
+        }
+        // if the number of empty plays is equal, less in the off
+        // is actually a benefit (more strongly ordered)
+        int off1 = in_off;
+        int off2 = rhs.in_off;
+        if (off1 != off2)
+        {
+            return off1 < off2;
+        }
+    }
+    // give a reproducible sort order, but std::sort doesn't give
+    // guarantess for equal items, so prefer them being different
+    return id < rhs.id;
+}
+
 QList<Move> Deck::getMoves() const
 {
     QList<Move> ret;
@@ -289,7 +355,7 @@ int Deck::shortestPath(int cap, bool debug)
     QVector<Deck> unvisited[6];
     unvisited[leftTalons()].append(Deck(*this));
     QSet<uint64_t> seen;
-    QVector<Deck> new_unvisited;
+    QVector<WeightedDeck> new_unvisited;
 
     while (true)
     {
@@ -301,44 +367,51 @@ int Deck::shortestPath(int cap, bool debug)
                 QList<Move> moves = deck->getMoves();
                 for (Move m : moves)
                 {
-                    //   std::cout << deck->explainMove(m).toStdString() << std::endl;
+                    //std::cout << deck->explainMove(m).toStdString() << std::endl;
                     Deck *newdeck = deck->applyMove(m);
                     uint64_t hash = newdeck->id();
                     if (!seen.contains(hash))
                     {
-                        new_unvisited.append(*newdeck);
+                        new_unvisited.append(WeightedDeck(newdeck, hash));
                         seen.insert(hash);
                     }
-                    delete newdeck;
-                    newdeck = 0;
+                    else
+                    {
+                        delete newdeck;
+                    }
                 }
             }
             unvisited[i].clear();
         }
+
         if (new_unvisited.empty())
             break;
 
         bool printed = false;
         std::sort(new_unvisited.begin(), new_unvisited.end());
-        QVector<Deck>::const_iterator it = new_unvisited.cbegin();
+        QVector<WeightedDeck>::const_iterator it = new_unvisited.cbegin();
         for (; it != new_unvisited.cend(); ++it)
         {
             if (!printed)
             {
-                std::cout << "DEPTH " << depth << " " << new_unvisited.length() << " chaos: " << it->chaos() << std::endl;
+                std::cout << "DEPTH " << depth << " " << new_unvisited.length() << " chaos: " << it->chaos << " " << int(it->playable) << std::endl;
                 if (depth != 1)
                     printed = true;
             }
-            if (it->isWon())
+            if (it->in_off == 104)
             {
-                memcpy(moves, it->moves, sizeof(Move) * MAX_MOVES);
-                moves_index = it->moves_index;
+                memcpy(moves, it->deck->moves, sizeof(Move) * MAX_MOVES);
+                moves_index = it->deck->moves_index;
                 return depth;
             }
-            int lt = it->leftTalons();
+            int lt = it->left_talons;
             if (unvisited[lt].length() < cap)
             {
-                unvisited[lt].append(*it);
+                unvisited[lt].append(*it->deck);
+            }
+            else
+            {
+                delete it->deck;
             }
         }
 
@@ -384,49 +457,6 @@ int Deck::freePlays() const
         }
     }
     return result;
-}
-
-// smaller is better!
-bool Deck::operator<(const Deck &rhs) const
-{
-    int chaos1 = chaos();
-    int chaos2 = rhs.chaos();
-    if (chaos1 != chaos2)
-    {
-        // smaller chaos is better
-        return chaos1 < chaos2;
-    }
-    int ready1 = playableCards() + inOff() + freePlays();
-    int ready2 = rhs.playableCards() + rhs.inOff() + rhs.freePlays();
-    if (ready1 != ready2)
-    {
-        // larger values are better
-        return ready1 > ready2;
-    }
-
-    // once we are in straight win mode, we go differently
-    if (chaos1 == 0)
-    {
-        int free1 = freePlays();
-        int free2 = rhs.freePlays();
-
-        if (free1 != free2)
-        {
-            // more free is better
-            return free1 > free2;
-        }
-        // if the number of empty plays is equal, less in the off
-        // is actually a benefit (more strongly ordered)
-        int off1 = inOff();
-        int off2 = rhs.inOff();
-        if (off1 != off2)
-        {
-            return off1 < off2;
-        }
-    }
-    // give a reproducible sort order, but std::sort doesn't give
-    // guarantess for equal items, so prefer them being different
-    return id() < rhs.id();
 }
 
 bool Deck::isWon() const
