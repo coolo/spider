@@ -11,7 +11,6 @@ class Deck
 public:
     Deck()
     {
-        m_chaos = -17;
         m_moves = 0;
     }
     Deck(const Deck &other);
@@ -20,10 +19,9 @@ public:
     QString explainMove(Move m);
     Deck *applyMove(Move m, bool stop = false);
     uint64_t id() const;
-    int chaos() const { return m_chaos; }
     int moves() const { return m_moves; }
     int leftTalons() const;
-    void calculateChaos();
+    int chaos() const;
     QList<Move> order;
     void assignLeftCards(QList<Card> &list);
     int shortestPath(int cap, bool debug);
@@ -38,7 +36,6 @@ private:
     Pile off;
 
     int m_moves;
-    int m_chaos;
 };
 
 #endif

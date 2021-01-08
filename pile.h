@@ -14,13 +14,11 @@ private:
 public:
     Pile()
     {
-        m_chaos = 0;
-        count = 0;
+             count = 0;
     }
     Pile(Pile *other)
     {
         count = other->count;
-        m_chaos = other->m_chaos;
         memcpy(cards, other->cards, MAX_CARDS);
     }
     void addCard(const Card &c);
@@ -31,15 +29,13 @@ public:
     void remove(int index);
     void copyFrom(const Pile &from, int index);
     void replaceAt(int index, const Card &c);
-    int chaos() const { return m_chaos; }
+    int chaos() const;
     void assignLeftCards(QList<Card> &list);
     void clear();
     void clone(const Pile &rhs);
     const unsigned char *cardsPtr() const { return (const unsigned char *)cards; };
 
 private:
-    void calculateChaos();
-    int m_chaos;
     Card cards[MAX_CARDS];
     size_t count;
 };

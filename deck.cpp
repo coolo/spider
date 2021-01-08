@@ -10,12 +10,12 @@
 
 QList<Move> Deck::getMoves()
 {
-    bool talons_done = true;
+    int next_talon = -1;
     for (int i = 0; i < 5; i++)
     {
         if (!talon[i].empty())
         {
-            talons_done = false;
+            next_talon = i;
             break;
         }
     }
@@ -72,7 +72,7 @@ QList<Move> Deck::getMoves()
                 }
                 else if (moved_to_empty)
                 {
-                    if (talons_done)
+                    if (next_talon < 0)
                         continue;
                 }
                 else
@@ -89,19 +89,9 @@ QList<Move> Deck::getMoves()
         }
     }
 
-    if (!one_is_empty)
+    if (!one_is_empty && next_talon >= 0)
     {
-        from = 0;
-        for (; from < 5; from++)
-        {
-            if (!talon[from].empty())
-            {
-                ret.append(Move());
-                ret.last().from = from;
-                ret.last().talon = true;
-                break;
-            }
-        }
+        ret.append(Move::fromTalon(next_talon));
     }
     return ret;
 }
@@ -115,7 +105,6 @@ Deck::Deck(const Deck &other)
     for (int i = 0; i < 5; i++)
         talon[i].clone(other.talon[i]);
     off.clone(other.off);
-    m_chaos = other.m_chaos;
 }
 
 QString Deck::explainMove(Move m)
@@ -181,7 +170,6 @@ Deck *Deck::applyMove(Move m, bool stop)
             exit(1);
         }
     }
-    newone->calculateChaos();
     return newone;
 }
 
@@ -244,20 +232,21 @@ int Deck::free_talons() const
     return talons;
 }
 
-void Deck::calculateChaos()
+int Deck::chaos() const
 {
-    m_chaos = 0;
+    int chaos = 0;
     for (int i = 0; i < 10; i++)
     {
-        m_chaos += play[i].chaos();
+        chaos += play[i].chaos();
     }
     for (int i = 0; i < 5; i++)
     {
         if (!talon[i].empty())
         {
-            m_chaos += 11;
+            chaos += 11;
         }
     }
+    return chaos;
 }
 
 int Deck::leftTalons() const
@@ -276,7 +265,7 @@ int Deck::leftTalons() const
 
 int Deck::shortestPath(int cap, bool debug)
 {
-    int depth = 0;
+    int depth = 1;
 
     QVector<Deck> unvisited[6];
     unvisited[free_talons()].append(Deck(*this));
@@ -289,11 +278,11 @@ int Deck::shortestPath(int cap, bool debug)
         {
             for (auto deck = unvisited[i].begin(); deck != unvisited[i].end(); deck++)
             {
-                //std::cout << deck->toString().toStdString() << std::endl;
+                std::cout << deck->toString().toStdString() << std::endl;
                 QList<Move> moves = deck->getMoves();
                 for (Move m : moves)
                 {
-                    //std::cout << deck->explainMove(m).toStdString() << std::endl;
+                    std::cout << deck->explainMove(m).toStdString() << std::endl;
                     Deck *newdeck = deck->applyMove(m);
                     uint64_t hash = newdeck->id();
                     if (!seen.contains(hash))
@@ -303,21 +292,26 @@ int Deck::shortestPath(int cap, bool debug)
                     }
                     delete newdeck;
                 }
+                exit(1);
             }
             unvisited[i].clear();
         }
-        qDebug() << "DEPTH" << depth << new_unvisited.length();
         if (new_unvisited.empty())
             break;
 
+        bool printed = false;
         std::sort(new_unvisited.begin(), new_unvisited.end());
-        QVector<Deck>::const_reverse_iterator it = new_unvisited.crbegin();
-        for (; it != new_unvisited.crend(); ++it)
+        QVector<Deck>::const_iterator it = new_unvisited.cbegin();
+        for (; it != new_unvisited.cend(); ++it)
         {
-
+            if (!printed)
+            {
+                std::cout << "DEPTH " << depth << " " << new_unvisited.length() << " chaos: " << it->chaos() << std::endl;
+                if (depth != 1)
+                    printed = true;
+            }
             if (it->is_won())
             {
-                qDebug() << "WIN";
                 return depth;
             }
             int lt = it->leftTalons();
@@ -347,7 +341,53 @@ void Deck::addCard(int index, const Card &c)
 
 bool Deck::operator<(const Deck &rhs) const
 {
+    int chaos1 = chaos();
+    int chaos2 = rhs.chaos();
+    if (chaos1 != chaos2)
+    {
+        return chaos1 < chaos2;
+    }
     return false;
+    /*
+     let ord = other.chaos.cmp(&self.chaos);
+        if ord != Ordering::Equal {
+            return ord;
+        }
+        let ready1 = self.playable + self.in_off + self.free_plays;
+        let ready2 = other.playable + other.in_off + other.free_plays;
+        let ord = ready1.cmp(&ready2);
+        if ord != Ordering::Equal {
+            return ord;
+        }
+        if self.chaos == 0 {
+            // once we are in straight win mode, we go differently
+            let ord = self.free_plays.cmp(&other.free_plays);
+            if ord != Ordering::Equal {
+                return ord;
+            }
+            // if the number of empty plays is equal, less in the off
+            // is actually a benefit (more strongly ordered)
+            let ord = other.in_off.cmp(&self.in_off);
+            if ord != Ordering::Equal {
+                return ord;
+            }
+        }
+        // while it's tempting to order just by hash, this doesn't give reproducible
+        // behaviour between runs if the PileTrees differ (and as such the IDs)
+        for i in 0..5 {
+            let ord = self.deck.talon[i].cmp(&other.deck.talon[i]);
+            if ord != Ordering::Equal {
+                return ord;
+            }
+        }
+        for i in 0..10 {
+            let ord = self.deck.play[i].cmp(&other.deck.play[i]);
+            if ord != Ordering::Equal {
+                return ord;
+            }
+        }
+        Ordering::Equal
+    }*/
 }
 
 bool Deck::is_won() const

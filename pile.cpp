@@ -39,9 +39,9 @@ void Pile::addCard(const Card &c)
     cards[count++] = c;
 }
 
-void Pile::calculateChaos()
+int Pile::chaos() const
 {
-    m_chaos = 0;
+    int chaos = 0;
     Card prev_card;
     int index = count;
     while (--index >= 0)
@@ -49,27 +49,28 @@ void Pile::calculateChaos()
         Card c = cards[index];
         if (!c.is_faceup())
         {
-            m_chaos += 2;
+            chaos += 2;
         }
         else if (prev_card.rank() != None)
         {
             if (c.suit() == prev_card.suit() && c.rank() == prev_card.rank() + 1)
-                m_chaos += 0;
+                chaos += 0;
             else
             {
                 if (c.rank() < prev_card.rank())
-                    m_chaos += 2;
+                    chaos += 2;
                 else
-                    m_chaos += 1;
+                    chaos += 1;
             }
         }
         else
         {
-            m_chaos += 1;
+            chaos += 1;
         }
         prev_card = c;
     }
-    //qDebug() << seen.count() << QString("%1").arg(m_id, 16, 16, QLatin1Char('0')) << m_chaos << toString();
+    //qDebug() << chaos << toString();
+    return chaos;
 }
 
 void Pile::clear()
@@ -101,7 +102,6 @@ void Pile::replaceAt(int index, const Card &c)
 
 void Pile::clone(const Pile &rhs)
 {
-    m_chaos = rhs.m_chaos;
     count = rhs.count;
     memcpy(cards, rhs.cards, MAX_CARDS);
 }

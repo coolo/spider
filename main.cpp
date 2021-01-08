@@ -141,7 +141,6 @@ int main(int argc, char **argv)
         qDebug() << "Required left:" << required;
     }
     Q_ASSERT(required.empty());
-    d.calculateChaos();
-    qDebug() << d.shortestPath(200, false);
+    qDebug() << d.shortestPath(500, false);
     return 0;
 }
