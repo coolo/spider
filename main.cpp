@@ -73,10 +73,10 @@ int main(int argc, char **argv)
         {
             if (token.length() == 6)
             {
-                Card first(token.mid(0, 2));
+                Card first(token.mid(0, 2).toStdString());
                 Q_ASSERT(token.mid(2, 2) == "..");
                 //if (token.mid(2,4))
-                Card last(token.mid(4, 2));
+                Card last(token.mid(4, 2).toStdString());
                 while (first.rank() >= last.rank())
                 {
                     assert(required.contains(first));
@@ -87,7 +87,7 @@ int main(int argc, char **argv)
             }
             else
             {
-                Card c(token);
+                Card c(token.toStdString());
                 if (piles == 15)
                 {
                     for (int rank = Ace; rank <= King; rank++)
@@ -103,8 +103,8 @@ int main(int argc, char **argv)
                     {
                         if (!required.contains(c))
                         {
-                            qDebug() << "too many" << c;
-                            assert(required.contains(c));
+                            std::cerr << "too many " << c.toString() << std::endl;
+                            exit(1);
                         }
                     }
                     required.removeOne(c);
@@ -112,12 +112,6 @@ int main(int argc, char **argv)
                 d.addCard(piles, c);
             }
         }
-    }
-    if (!required.empty())
-    {
-        for (int i = 0; i < required.size(); i++)
-            required[i].set_unknown(false);
-        qDebug() << "Required left:" << required;
     }
     // take this with standard seed
     std::random_shuffle(required.begin(), required.end());
@@ -127,15 +121,21 @@ int main(int argc, char **argv)
     {
         for (int i = 0; i < required.size(); i++)
             required[i].set_unknown(false);
-        qDebug() << "Required left:" << required;
+        std::cerr << "Required left: [ ";
+        for (Card c : required)
+        {
+            std::cerr << c.toString() << " ";
+        }
+        std::cerr << " ]" << std::endl;
+        exit(1);
     }
-    Q_ASSERT(required.empty());
     if (d.shortestPath(500, false) > 0)
     {
         qDebug() << "WON";
         int counter = 1;
 
-        Deck orig = d;
+        Deck orig;
+        orig = d;
         for (Move m : d.getWinMoves())
         {
             //std::cout << orig.toString().toStdString() << std::endl;

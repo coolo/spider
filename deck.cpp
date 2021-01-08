@@ -10,27 +10,26 @@
 
 struct WeightedDeck
 {
-    WeightedDeck(Deck *d, uint64 hash);
     uchar left_talons;
     int chaos;
     int64_t id;
     uchar in_off;
     uchar free_plays;
     uchar playable;
-    Deck *deck;
+    Deck deck;
 
     bool operator<(const WeightedDeck &rhs) const;
+    void update(uint64_t hash);
 };
 
-WeightedDeck::WeightedDeck(Deck *d, uint64_t hash)
+void WeightedDeck::update(uint64_t hash)
 {
-    deck = d;
-    left_talons = d->leftTalons();
+    left_talons = deck.leftTalons();
     id = hash;
-    in_off = d->inOff();
-    free_plays = d->freePlays();
-    playable = d->playableCards();
-    chaos = d->chaos();
+    in_off = deck.inOff();
+    free_plays = deck.freePlays();
+    playable = deck.playableCards();
+    chaos = deck.chaos();
 }
 
 // smaller is better!
@@ -190,7 +189,7 @@ void Deck::getMoves(QVector<Move> &moves) const
     }
 }
 
-Deck::Deck(const Deck &other)
+void Deck::update(const Deck &other)
 {
     memcpy(moves, other.moves, sizeof(Move) * MAX_MOVES);
     moves_index = other.moves_index;
@@ -221,11 +220,11 @@ QString Deck::explainMove(Move m)
     {
         return QString("Move a sequence from %1 to the off").arg(m.from + 1);
     }
-    QString fromCard = play[m.from].at(m.index).toString();
-    QString toCard = "Empty";
+    std::string fromCard = play[m.from].at(m.index).toString();
+    std::string toCard = "Empty";
     if (play[m.to].cardCount() > 0)
         toCard = play[m.to].at(play[m.to].cardCount() - 1).toString();
-    return QString("Move %1 cards from %2 to %3 - %4->%5").arg(play[m.from].cardCount() - m.index).arg(m.from + 1).arg(m.to + 1).arg(fromCard).arg(toCard);
+    return QString("Move %1 cards from %2 to %3 - %4->%5").arg(play[m.from].cardCount() - m.index).arg(m.from + 1).arg(m.to + 1).arg(QString::fromStdString(fromCard)).arg(QString::fromStdString(toCard));
 }
 
 void Deck::applyMove(const Move &m, Deck &newdeck, bool stop)
@@ -262,7 +261,7 @@ void Deck::applyMove(const Move &m, Deck &newdeck, bool stop)
             std::cout << "What's up?" << std::endl;
             std::string line;
             std::getline(std::cin, line);
-            Card c(QString::fromStdString(line));
+            Card c(line);
             newdeck.play[m.from].replaceAt(m.index - 1, c);
             QFile file("tmp");
             file.open(QIODevice::WriteOnly);
@@ -280,20 +279,20 @@ QString Deck::toString() const
     for (int i = 0; i < 10; i++)
     {
         ret += QString("Play%1:").arg(i);
-        ret += play[i].toString();
+        ret += QString::fromStdString(play[i].toString());
         ret += QStringLiteral("\n");
     }
 
     for (int i = 0; i < 5; i++)
     {
         ret += QString("Deal%1:").arg(i);
-        ret += talon[i].toString();
+        ret += QString::fromStdString(talon[i].toString());
         ret += QStringLiteral("\n");
         counter++;
     }
 
     ret += "Off:";
-    ret += off.toString();
+    ret += QString::fromStdString(off.toString());
     ret += QStringLiteral("\n");
 
     return ret;
@@ -352,69 +351,80 @@ int Deck::chaos() const
 int Deck::shortestPath(int cap, bool debug)
 {
     int depth = 1;
+    moves_index = 0;
 
-    QVector<Deck> unvisited[6];
-    unvisited[leftTalons()].append(Deck(*this));
+    Deck *unvisited = new Deck[6 * cap];
+    int unvisited_count[6] = {0, 0, 0, 0, 0, 0};
+    int unvisited_count_total = 0;
+    unvisited[unvisited_count_total++].update(*this);
+
     QSet<uint64_t> seen;
-    QVector<WeightedDeck> new_unvisited;
+    const int max_new_unvisited = cap * 6 * 30;
+    WeightedDeck *new_unvisited = new WeightedDeck[max_new_unvisited];
+    int new_unvisited_counter = 0;
     QVector<Move> current_moves;
-    Deck newdeck;
     while (true)
     {
-        for (int i = 0; i <= 5; i++)
+        for (int i = 0; i < unvisited_count_total; i++)
         {
-            for (auto deck = unvisited[i].begin(); deck != unvisited[i].end(); deck++)
+            // std::cout << deck->toString().toStdString() << std::endl;
+            unvisited[i].getMoves(current_moves);
+            for (Move m : current_moves)
             {
-                //std::cout << deck->toString().toStdString() << std::endl;
-                deck->getMoves(current_moves);
-                for (Move m : current_moves)
+                //std::cout << deck->explainMove(m).toStdString() << std::endl;
+                unvisited[i].applyMove(m, new_unvisited[new_unvisited_counter].deck);
+                //std::cout << newdeck.toString().toStdString() << std::endl;
+                uint64_t hash = new_unvisited[new_unvisited_counter].deck.id();
+                if (!seen.contains(hash))
                 {
-                    //std::cout << deck->explainMove(m).toStdString() << std::endl;
-                    deck->applyMove(m, newdeck);
-                    uint64_t hash = newdeck.id();
-                    if (!seen.contains(hash))
+                    new_unvisited[new_unvisited_counter++].update(hash);
+                    seen.insert(hash);
+                    if (max_new_unvisited == new_unvisited_counter)
                     {
-                        new_unvisited.append(WeightedDeck(new Deck(newdeck), hash));
-                        seen.insert(hash);
+                        std::cerr << "Too many unvisted " << new_unvisited_counter << std::endl;
+                        exit(1);
                     }
                 }
             }
-            unvisited[i].clear();
         }
+        for (int lt = 0; lt <= 5; lt++)
+            unvisited_count[lt] = 0;
 
-        if (new_unvisited.empty())
+        unvisited_count_total = 0;
+
+        if (new_unvisited_counter == 0)
             break;
 
         bool printed = false;
-        std::sort(new_unvisited.begin(), new_unvisited.end());
-        QVector<WeightedDeck>::const_iterator it = new_unvisited.cbegin();
-        for (; it != new_unvisited.cend(); ++it)
+        std::sort(new_unvisited, new_unvisited + new_unvisited_counter);
+        for (int i = 0; i < new_unvisited_counter; i++)
         {
             if (!printed)
             {
-                std::cout << "DEPTH " << depth << " " << new_unvisited.length() << " chaos: " << it->chaos << " " << int(it->playable) << std::endl;
+                std::cout << "DEPTH " << depth << " " << new_unvisited_counter << " chaos: " << new_unvisited[i].chaos << " " << int(new_unvisited[i].playable) << std::endl;
                 printed = true;
             }
-            if (it->in_off == 104)
+            if (new_unvisited[i].in_off == 104)
             {
-                memcpy(moves, it->deck->moves, sizeof(Move) * MAX_MOVES);
-                moves_index = it->deck->moves_index;
+                memcpy(moves, new_unvisited[i].deck.moves, sizeof(Move) * MAX_MOVES);
+                moves_index = new_unvisited[i].deck.moves_index;
+                delete[] unvisited;
+                delete[] new_unvisited;
                 return depth;
             }
-            int lt = it->left_talons;
-            if (unvisited[lt].length() < cap)
+            int lt = new_unvisited[i].left_talons;
+            if (unvisited_count[lt] < cap)
             {
-                unvisited[lt].append(*it->deck);
-            }
-            else
-            {
-                delete it->deck;
+                unvisited[unvisited_count_total++].update(new_unvisited[i].deck);
+                unvisited_count[lt]++;
             }
         }
 
-        new_unvisited.clear();
+        new_unvisited_counter = 0;
         depth += 1;
     }
+    delete[] unvisited;
+    delete[] new_unvisited;
     return -1 * depth;
 }
 

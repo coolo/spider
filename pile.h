@@ -8,24 +8,17 @@ const int MAX_CARDS = 104;
 
 class Pile
 {
-private:
-    Pile(const Pile &);
-
 public:
     Pile()
     {
-        count = 0;
-    }
-    Pile(Pile *other)
-    {
-        count = other->count;
-        memcpy(cards, other->cards, MAX_CARDS);
+        memset(cards, 0, MAX_CARDS + 1);
     }
     void addCard(const Card &c);
-    QString toString() const;
-    bool empty() const { return count == 0; }
-    Card at(int index) const { return cards[index]; }
-    size_t cardCount() const { return count; }
+    std::string toString() const;
+    bool empty() const { return cards[0] == 0; }
+    const Card at(int index) const { return Card(cards[index + 1]); }
+    void setAt(int index, const Card &c) { cards[index + 1] = c.raw_value(); }
+    inline size_t cardCount() const { return cards[0]; }
     void remove(int index);
     void copyFrom(const Pile &from, int index);
     void replaceAt(int index, const Card &c);
@@ -38,8 +31,7 @@ public:
     int playableCards() const;
 
 private:
-    Card cards[MAX_CARDS];
-    size_t count;
+    uchar cards[MAX_CARDS + 1];
 };
 
 #endif

@@ -10,12 +10,15 @@ const int MAX_MOVES = 230;
 
 class Deck
 {
+private:
+    // Deck(const Deck &other);
+
 public:
     Deck()
     {
-        moves_index = 0;
     }
-    Deck(const Deck &other);
+
+    void update(const Deck &);
     void getMoves(QVector<Move> &moves) const;
     QVector<Move> getWinMoves() const;
     QString toString() const;

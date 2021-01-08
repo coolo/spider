@@ -1,8 +1,7 @@
 #ifndef _CARD_H_
 #define _CARD_H_ 1
 
-#include <QString>
-#include <QDebug>
+#include <string>
 
 enum Suit
 {
@@ -35,12 +34,13 @@ struct Card
     // 2 bits suit
     // 1 bit faceup
     // 1 bit unknown
-    uchar value;
+    unsigned char value;
 
     Card()
     {
         value = 0;
     }
+    Card(unsigned char v) { value = v; }
 
     inline bool is_faceup() const
     {
@@ -100,14 +100,15 @@ struct Card
     }
 
     bool inSequenceTo(const Card &other) const;
-    Card(QString token);
-    QString toString() const;
+    Card(const std::string &token);
+    std::string toString() const;
     Suit char2suit(char c);
     Rank char2rank(char c);
-    unsigned char raw_value() { return value; }
+    unsigned char raw_value() const { return value; }
     bool operator==(const Card &rhs) const;
 };
 
+/*
 inline QDebug operator<<(QDebug debug, const Card &c)
 {
     QDebugStateSaver saver(debug);
@@ -115,7 +116,7 @@ inline QDebug operator<<(QDebug debug, const Card &c)
 
     return debug;
 }
-
+*/
 inline bool Card::inSequenceTo(const Card &other) const
 {
     return other.is_faceup() && other.suit() == suit() && other.rank() == rank() + 1;

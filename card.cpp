@@ -1,15 +1,15 @@
 #include "card.h"
+#include <string>
 #include <QDebug>
-#include <QString>
 
-QString Card::toString() const
+std::string Card::toString() const
 {
     if (is_unknown() && is_faceup())
         return "XX";
     if (is_unknown())
         return "|XX";
 
-    QString ret;
+    std::string ret;
     switch (rank())
     {
     case Ace:
@@ -116,13 +116,14 @@ Rank Card::char2rank(char c)
     return Ace;
 }
 
-Card::Card(QString token)
+Card::Card(const std::string &token_)
 {
+    std::string token = token_;
     value = 0;
-    set_faceup(!token.startsWith('|'));
+    set_faceup(token.find('|') != 0);
     if (!is_faceup())
     {
-        token.remove(0, 1);
+        token.erase(0, 1);
     }
     if (token == "XX")
     {
@@ -132,8 +133,8 @@ Card::Card(QString token)
         return;
     }
 
-    set_rank(char2rank(token[0].toLatin1()));
-    set_suit(char2suit(token[1].toLatin1()));
+    set_rank(char2rank(token[0]));
+    set_suit(char2suit(token[1]));
     set_unknown(false);
 }
 

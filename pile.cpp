@@ -7,43 +7,47 @@ void Pile::copyFrom(const Pile &from, int index)
 {
     for (int i = index; i < from.cardCount(); i++)
     {
-        cards[count++] = from.at(i);
+        setAt(cardCount(), from.at(i));
+        cards[0]++;
     }
 }
 
-QString Pile::toString() const
+std::string Pile::toString() const
 {
-    QString ret;
-    for (int i = 0; i < count; i++)
+    std::string ret;
+    for (int i = 0; i < cards[0]; i++)
     {
-        ret += " " + cards[i].toString();
+        ret += " " + Card(cards[i + 1]).toString();
     }
     return ret;
 }
 
 void Pile::remove(int index)
 {
-    while (count > index)
+    while (cards[0] > index)
     {
-        cards[count - 1] = Card();
-        count--;
+        cards[cards[0]] = 0;
+        cards[0]--;
     }
     if (index > 0)
     {
-        cards[index - 1].set_faceup(true);
+        Card c = at(index - 1);
+        c.set_faceup(true);
+        setAt(index - 1, c);
     }
 }
 
 void Pile::addCard(const Card &c)
 {
-    cards[count++] = c;
+    setAt(cardCount(), c);
+    cards[0]++;
 }
 
 int Pile::chaos() const
 {
     int result = 0;
     Card lastcard;
-    for (int i = 0; i < count; i++)
+    for (int i = 0; i < cardCount(); i++)
     {
         Card current = at(i);
 
@@ -66,35 +70,30 @@ int Pile::chaos() const
 
 void Pile::clear()
 {
-    for (int index = 0; index < count; index++)
-    {
-        cards[index] = Card();
-    }
-    count = 0;
+    memset(cards, 0, MAX_CARDS + 1);
 }
 
 void Pile::assignLeftCards(QList<Card> &list)
 {
-    for (int index = 0; index < count; index++)
+    for (int index = 0; index < cardCount(); index++)
     {
-        if (cards[index].is_unknown())
+        if (at(index).is_unknown())
         {
             Card c = list.takeFirst();
-            c.set_faceup(cards[index].is_faceup());
-            cards[index] = c;
+            c.set_faceup(at(index).is_faceup());
+            cards[index + 1] = c.raw_value();
         }
     }
 }
 
 void Pile::replaceAt(int index, const Card &c)
 {
-    cards[index] = c;
+    cards[index + 1] = c.raw_value();
 }
 
 void Pile::clone(const Pile &rhs)
 {
-    count = rhs.count;
-    memcpy(cards, rhs.cards, MAX_CARDS);
+    memcpy(cards, rhs.cards, MAX_CARDS + 1);
 }
 
 int Pile::sequenceOf(Suit suit) const
@@ -120,9 +119,9 @@ int Pile::sequenceOf(Suit suit) const
 
 int Pile::playableCards() const
 {
-    if (count < 2)
+    if (cards[0] < 2)
     {
-        return count;
+        return cards[0];
     }
-    return sequenceOf(at(count - 1).suit());
+    return sequenceOf(at(cards[0] - 1).suit());
 }
