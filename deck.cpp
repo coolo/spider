@@ -370,51 +370,47 @@ int Deck::freePlays() const
     return result;
 }
 
+// smaller is better!
 bool Deck::operator<(const Deck &rhs) const
 {
     int chaos1 = chaos();
     int chaos2 = rhs.chaos();
     if (chaos1 != chaos2)
     {
+        // smaller chaos is better
         return chaos1 < chaos2;
     }
     int ready1 = playableCards() + inOff() + freePlays();
     int ready2 = rhs.playableCards() + rhs.inOff() + rhs.freePlays();
     if (ready1 != ready2)
     {
-        return ready1 < ready2;
+        // larger values are better
+        return ready1 > ready2;
     }
-    return false;
-    /*
-        if self.chaos == 0 {
-            // once we are in straight win mode, we go differently
-            let ord = self.free_plays.cmp(&other.free_plays);
-            if ord != Ordering::Equal {
-                return ord;
-            }
-            // if the number of empty plays is equal, less in the off
-            // is actually a benefit (more strongly ordered)
-            let ord = other.in_off.cmp(&self.in_off);
-            if ord != Ordering::Equal {
-                return ord;
-            }
+
+    // once we are in straight win mode, we go differently
+    if (chaos1 == 0)
+    {
+        int free1 = freePlays();
+        int free2 = rhs.freePlays();
+
+        if (free1 != free2)
+        {
+            // more free is better
+            return free1 > free2;
         }
-        // while it's tempting to order just by hash, this doesn't give reproducible
-        // behaviour between runs if the PileTrees differ (and as such the IDs)
-        for i in 0..5 {
-            let ord = self.deck.talon[i].cmp(&other.deck.talon[i]);
-            if ord != Ordering::Equal {
-                return ord;
-            }
+        // if the number of empty plays is equal, less in the off
+        // is actually a benefit (more strongly ordered)
+        int off1 = inOff();
+        int off2 = rhs.inOff();
+        if (off1 != off2)
+        {
+            return off1 < off2;
         }
-        for i in 0..10 {
-            let ord = self.deck.play[i].cmp(&other.deck.play[i]);
-            if ord != Ordering::Equal {
-                return ord;
-            }
-        }
-        Ordering::Equal
-    }*/
+    }
+    // give a reproducible sort order, but std::sort doesn't give
+    // guarantess for equal items, so prefer them being different
+    return id() < rhs.id();
 }
 
 bool Deck::isWon() const
