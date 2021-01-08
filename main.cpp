@@ -141,7 +141,7 @@ int main(int argc, char **argv)
             //std::cout << orig.toString().toStdString() << std::endl;
             if (!m.off)
                 std::cout << QString("%1").arg(counter++).toStdString() << " " << orig.explainMove(m).toStdString() << std::endl;
-            orig = *orig.applyMove(m, true);
+            orig.applyMove(m, orig, true);
         }
     }
 

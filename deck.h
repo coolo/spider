@@ -20,7 +20,7 @@ public:
     QVector<Move> getWinMoves() const;
     QString toString() const;
     QString explainMove(Move m);
-    Deck *applyMove(Move m, bool stop = false);
+    void applyMove(const Move &m, Deck &newdeck, bool stop = false);
     uint64_t id() const;
     int leftTalons() const;
     int chaos() const;

@@ -228,47 +228,49 @@ QString Deck::explainMove(Move m)
     return QString("Move %1 cards from %2 to %3 - %4->%5").arg(play[m.from].cardCount() - m.index).arg(m.from + 1).arg(m.to + 1).arg(fromCard).arg(toCard);
 }
 
-Deck *Deck::applyMove(Move m, bool stop)
+void Deck::applyMove(const Move &m, Deck &newdeck, bool stop)
 {
-    Deck *newone = new Deck(*this);
-    newone->moves[newone->moves_index++] = m;
+    // newdeck could be this - but no worries
+    newdeck = *this;
+    newdeck.moves[moves_index] = m;
+    newdeck.moves_index = moves_index + 1;
+
     if (m.talon)
     {
 
         for (int to = 0; to < 10; to++)
         {
-            Card c = newone->talon[m.from].at(to);
+            Card c = newdeck.talon[m.from].at(to);
             c.set_faceup(true);
-            newone->play[to].addCard(c);
+            newdeck.play[to].addCard(c);
         }
         // empty pile
-        newone->talon[m.from].clear();
+        newdeck.talon[m.from].clear();
     }
     else if (m.off)
     {
-        Card c = newone->play[m.from].at(newone->play[m.from].cardCount() - 13);
-        newone->off.addCard(c);
-        newone->play[m.from].remove(m.index);
+        Card c = newdeck.play[m.from].at(newdeck.play[m.from].cardCount() - 13);
+        newdeck.off.addCard(c);
+        newdeck.play[m.from].remove(m.index);
     }
     else
     {
-        newone->play[m.to].copyFrom(newone->play[m.from], m.index);
-        newone->play[m.from].remove(m.index);
-        if (stop && m.index > 0 && newone->play[m.from].at(m.index - 1).is_unknown())
+        newdeck.play[m.to].copyFrom(newdeck.play[m.from], m.index);
+        newdeck.play[m.from].remove(m.index);
+        if (stop && m.index > 0 && newdeck.play[m.from].at(m.index - 1).is_unknown())
         {
             std::cout << "What's up?" << std::endl;
             std::string line;
             std::getline(std::cin, line);
             Card c(QString::fromStdString(line));
-            newone->play[m.from].replaceAt(m.index - 1, c);
+            newdeck.play[m.from].replaceAt(m.index - 1, c);
             QFile file("tmp");
             file.open(QIODevice::WriteOnly);
-            file.write(newone->toString().toUtf8());
+            file.write(newdeck.toString().toUtf8());
             file.close();
             exit(1);
         }
     }
-    return newone;
 }
 
 QString Deck::toString() const
@@ -356,6 +358,7 @@ int Deck::shortestPath(int cap, bool debug)
     QSet<uint64_t> seen;
     QVector<WeightedDeck> new_unvisited;
     QVector<Move> current_moves;
+    Deck newdeck;
     while (true)
     {
         for (int i = 0; i <= 5; i++)
@@ -367,16 +370,12 @@ int Deck::shortestPath(int cap, bool debug)
                 for (Move m : current_moves)
                 {
                     //std::cout << deck->explainMove(m).toStdString() << std::endl;
-                    Deck *newdeck = deck->applyMove(m);
-                    uint64_t hash = newdeck->id();
+                    deck->applyMove(m, newdeck);
+                    uint64_t hash = newdeck.id();
                     if (!seen.contains(hash))
                     {
-                        new_unvisited.append(WeightedDeck(newdeck, hash));
+                        new_unvisited.append(WeightedDeck(new Deck(newdeck), hash));
                         seen.insert(hash);
-                    }
-                    else
-                    {
-                        delete newdeck;
                     }
                 }
             }
