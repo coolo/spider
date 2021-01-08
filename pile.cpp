@@ -41,36 +41,27 @@ void Pile::addCard(const Card &c)
 
 int Pile::chaos() const
 {
-    int chaos = 0;
-    Card prev_card;
-    int index = count;
-    while (--index >= 0)
+    int result = 0;
+    Card lastcard;
+    for (int i = 0; i < count; i++)
     {
-        Card c = cards[index];
-        if (!c.is_faceup())
+        Card current = at(i);
+
+        // first in stack
+        if (lastcard.raw_value() == 0)
         {
-            chaos += 2;
-        }
-        else if (prev_card.rank() != None)
-        {
-            if (c.suit() == prev_card.suit() && c.rank() == prev_card.rank() + 1)
-                chaos += 0;
-            else
-            {
-                if (c.rank() < prev_card.rank())
-                    chaos += 2;
-                else
-                    chaos += 1;
-            }
+            result++;
         }
         else
         {
-            chaos += 1;
+            if (!current.inSequenceTo(lastcard))
+            {
+                result++;
+            }
         }
-        prev_card = c;
+        lastcard = current;
     }
-    //qDebug() << chaos << toString();
-    return chaos;
+    return result;
 }
 
 void Pile::clear()
@@ -133,6 +124,5 @@ int Pile::playableCards() const
     {
         return count;
     }
-    Card top_card = at(count - 1);
-    return sequenceOf(top_card.suit());
+    return sequenceOf(at(count - 1).suit());
 }

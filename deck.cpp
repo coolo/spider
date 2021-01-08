@@ -332,6 +332,7 @@ int Deck::shortestPath(int cap, bool debug)
             if (it->isWon())
             {
                 memcpy(moves, it->moves, sizeof(Move) * MAX_MOVES);
+                moves_index = it->moves_index;
                 return depth;
             }
             int lt = it->leftTalons();
