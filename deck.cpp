@@ -74,12 +74,12 @@ bool WeightedDeck::operator<(const WeightedDeck &rhs) const
     return id < rhs.id;
 }
 
-QList<Move> Deck::getMoves() const
+void Deck::getMoves(QVector<Move> &moves) const
 {
-    QList<Move> ret;
+    moves.clear();
     if (moves_index >= MAX_MOVES - 1)
     {
-        return ret;
+        return;
     }
     int next_talon = -1;
     for (int i = 0; i < 5; i++)
@@ -119,9 +119,9 @@ QList<Move> Deck::getMoves() const
 
             if (play[from].cardCount() - index == 13)
             {
-                ret.clear();
-                ret.append(Move::toOff(from, index));
-                return ret;
+                moves.clear();
+                moves.append(Move::toOff(from, index));
+                return;
             }
             int broken_sequence = 0;
             if (index > 0)
@@ -178,7 +178,7 @@ QList<Move> Deck::getMoves() const
                     moved_to_empty = true;
                 }
 
-                ret.append(Move::regular(from, to, index));
+                moves.append(Move::regular(from, to, index));
             }
             index--;
         }
@@ -186,9 +186,8 @@ QList<Move> Deck::getMoves() const
 
     if (!one_is_empty && next_talon >= 0)
     {
-        ret.append(Move::fromTalon(next_talon));
+        moves.append(Move::fromTalon(next_talon));
     }
-    return ret;
 }
 
 Deck::Deck(const Deck &other)
@@ -356,7 +355,7 @@ int Deck::shortestPath(int cap, bool debug)
     unvisited[leftTalons()].append(Deck(*this));
     QSet<uint64_t> seen;
     QVector<WeightedDeck> new_unvisited;
-
+    QVector<Move> current_moves;
     while (true)
     {
         for (int i = 0; i <= 5; i++)
@@ -364,8 +363,8 @@ int Deck::shortestPath(int cap, bool debug)
             for (auto deck = unvisited[i].begin(); deck != unvisited[i].end(); deck++)
             {
                 //std::cout << deck->toString().toStdString() << std::endl;
-                QList<Move> moves = deck->getMoves();
-                for (Move m : moves)
+                deck->getMoves(current_moves);
+                for (Move m : current_moves)
                 {
                     //std::cout << deck->explainMove(m).toStdString() << std::endl;
                     Deck *newdeck = deck->applyMove(m);
@@ -395,8 +394,7 @@ int Deck::shortestPath(int cap, bool debug)
             if (!printed)
             {
                 std::cout << "DEPTH " << depth << " " << new_unvisited.length() << " chaos: " << it->chaos << " " << int(it->playable) << std::endl;
-                if (depth != 1)
-                    printed = true;
+                printed = true;
             }
             if (it->in_off == 104)
             {

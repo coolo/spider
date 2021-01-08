@@ -16,7 +16,7 @@ public:
         moves_index = 0;
     }
     Deck(const Deck &other);
-    QList<Move> getMoves() const;
+    void getMoves(QVector<Move> &moves) const;
     QVector<Move> getWinMoves() const;
     QString toString() const;
     QString explainMove(Move m);
