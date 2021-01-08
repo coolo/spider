@@ -99,6 +99,7 @@ struct Card
         value = (value << 4) + _rank;
     }
 
+    bool inSequenceTo(const Card &other) const;
     Card(QString token);
     QString toString() const;
     Suit char2suit(char c);
@@ -114,4 +115,10 @@ inline QDebug operator<<(QDebug debug, const Card &c)
 
     return debug;
 }
+
+inline bool Card::inSequenceTo(const Card &other) const
+{
+    return other.is_faceup() && other.suit() == suit() && other.rank() == rank() + 1;
+}
+
 #endif

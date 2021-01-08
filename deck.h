@@ -11,7 +11,6 @@ class Deck
 public:
     Deck()
     {
-        m_moves = 0;
     }
     Deck(const Deck &other);
     QList<Move> getMoves();
@@ -19,7 +18,6 @@ public:
     QString explainMove(Move m);
     Deck *applyMove(Move m, bool stop = false);
     uint64_t id() const;
-    int moves() const { return m_moves; }
     int leftTalons() const;
     int chaos() const;
     QList<Move> order;
@@ -34,8 +32,6 @@ private:
     Pile play[10];
     Pile talon[5];
     Pile off;
-
-    int m_moves;
 };
 
 #endif

@@ -28,6 +28,12 @@ struct Move
     {
         return Move(false, true, talon, 0, 0);
     }
+    static Move toOff(int from, int index) {
+        return Move(true, false, from, 0, index);
+    }
+    static Move regular(int from, int to, int index) {
+        return Move(false, false, from, to, index);
+    }
 };
 
 #endif

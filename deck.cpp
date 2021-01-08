@@ -50,12 +50,17 @@ QList<Move> Deck::getMoves()
             if (play[from].cardCount() - index == 13)
             {
                 ret.clear();
-                ret.append(Move());
-                ret.last().from = from;
-                ret.last().to = 0;
-                ret.last().off = true;
-                ret.last().index = index;
+                ret.append(Move::toOff(from, index));
                 return ret;
+            }
+            int broken_sequence = 0;
+            if (index > 0)
+            {
+                Card next_card = play[from].at(index - 1);
+                if (current.inSequenceTo(next_card))
+                {
+                    broken_sequence = play[from].cardCount() - index;
+                }
             }
             bool moved_to_empty = false;
             for (int to = 0; to < 10; to++)
@@ -69,6 +74,14 @@ QList<Move> Deck::getMoves()
                     Card top_card = play[to].at(to_count - 1);
                     if (top_card.rank() != top_rank + 1)
                         continue;
+                    // make sure we only enlarge sequences
+                    if (broken_sequence > 0)
+                    {
+                        if (play[to].sequenceOf(top_suit) + broken_sequence <= play[from].sequenceOf(top_suit))
+                        {
+                            continue;
+                        }
+                    }
                 }
                 else if (moved_to_empty)
                 {
@@ -77,13 +90,25 @@ QList<Move> Deck::getMoves()
                 }
                 else
                 {
+                    // while talons are there, optimisations are evil
+                    // but in end game we have more options
+                    if (next_talon < 0)
+                    {
+                        if (index == 0)
+                        {
+                            // forbid moves between empty cells once the talons are gone
+                            continue;
+                        }
+                        // there is no plausible reason to split up sequences in end game
+                        if (broken_sequence > 0)
+                        {
+                            continue;
+                        }
+                    }
                     moved_to_empty = true;
                 }
 
-                ret.append(Move());
-                ret.last().from = from;
-                ret.last().to = to;
-                ret.last().index = index;
+                ret.append(Move::regular(from, to, index));
             }
             index--;
         }
@@ -98,7 +123,6 @@ QList<Move> Deck::getMoves()
 
 Deck::Deck(const Deck &other)
 {
-    m_moves = other.m_moves;
     order = other.order;
     for (int i = 0; i < 10; i++)
         play[i].clone(other.play[i]);
@@ -127,12 +151,6 @@ QString Deck::explainMove(Move m)
 Deck *Deck::applyMove(Move m, bool stop)
 {
     Deck *newone = new Deck(*this);
-
-    if (!m.off)
-    {
-        newone->m_moves += 1;
-        //qDebug() << newone->m_moves;
-    }
     newone->order.append(m);
     if (m.talon)
     {
@@ -278,11 +296,11 @@ int Deck::shortestPath(int cap, bool debug)
         {
             for (auto deck = unvisited[i].begin(); deck != unvisited[i].end(); deck++)
             {
-                std::cout << deck->toString().toStdString() << std::endl;
+                //std::cout << deck->toString().toStdString() << std::endl;
                 QList<Move> moves = deck->getMoves();
                 for (Move m : moves)
                 {
-                    std::cout << deck->explainMove(m).toStdString() << std::endl;
+                    //   std::cout << deck->explainMove(m).toStdString() << std::endl;
                     Deck *newdeck = deck->applyMove(m);
                     uint64_t hash = newdeck->id();
                     if (!seen.contains(hash))
@@ -292,7 +310,6 @@ int Deck::shortestPath(int cap, bool debug)
                     }
                     delete newdeck;
                 }
-                exit(1);
             }
             unvisited[i].clear();
         }
@@ -312,6 +329,7 @@ int Deck::shortestPath(int cap, bool debug)
             }
             if (it->is_won())
             {
+                order = it->order;
                 return depth;
             }
             int lt = it->leftTalons();

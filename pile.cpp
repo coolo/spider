@@ -105,3 +105,24 @@ void Pile::clone(const Pile &rhs)
     count = rhs.count;
     memcpy(cards, rhs.cards, MAX_CARDS);
 }
+
+int Pile::sequenceOf(Suit suit) const
+{
+    int index = cardCount();
+    if (index == 0)
+    {
+        return index;
+    }
+    index--;
+    Card top_card = at(index);
+    if (top_card.suit() != suit)
+    {
+        return 0;
+    }
+    while (index > 0 && top_card.inSequenceTo(at(index - 1)))
+    {
+        index--;
+        top_card = at(index);
+    }
+    return cardCount() - index;
+}

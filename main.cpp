@@ -10,17 +10,6 @@
 #include <iostream>
 #include <queue>
 
-class ChaosCompare
-{
-public:
-    bool operator()(Deck *v1, Deck *v2)
-    {
-        return v1->chaos() + v1->moves() > v2->chaos() + v2->moves();
-    }
-};
-
-typedef std::priority_queue<Deck *, std::vector<Deck *>, ChaosCompare> DeckList;
-
 int main(int argc, char **argv)
 {
     QCoreApplication app(argc, argv);
@@ -141,6 +130,20 @@ int main(int argc, char **argv)
         qDebug() << "Required left:" << required;
     }
     Q_ASSERT(required.empty());
-    qDebug() << d.shortestPath(500, false);
+    if (d.shortestPath(500, false) > 0)
+    {
+        qDebug() << "WON";
+        int counter = 1;
+
+        Deck orig = d;
+        for (Move m : d.order)
+        {
+            //std::cout << orig.toString().toStdString() << std::endl;
+            if (!m.off)
+                std::cout << QString("%1").arg(counter++).toStdString() << " " << orig.explainMove(m).toStdString() << std::endl;
+            orig = *orig.applyMove(m, true);
+        }
+    }
+
     return 0;
 }

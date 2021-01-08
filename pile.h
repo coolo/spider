@@ -34,6 +34,7 @@ public:
     void clear();
     void clone(const Pile &rhs);
     const unsigned char *cardsPtr() const { return (const unsigned char *)cards; };
+    int sequenceOf(Suit suit) const;
 
 private:
     Card cards[MAX_CARDS];
