@@ -194,7 +194,8 @@ fn pick(
         println!("WON");
         return 0;
     }
-    let moves = deck.get_moves();
+    let mut moves = vec![];
+    deck.get_moves(&mut moves);
     let mut best_total = deck::MAX_MOVES;
     let mut bestdeck: Option<Deck> = None;
 

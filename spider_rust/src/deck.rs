@@ -238,12 +238,12 @@ impl Deck {
         result
     }
 
-    pub fn get_moves(&self) -> Vec<Move> {
-        let mut vec = Vec::new();
+    pub fn get_moves(&self, vec: &mut Vec<Move>) {
+        vec.clear();
 
         if self.moves_index == MAX_MOVES - 1 {
             //println!("Too deep {}", self.to_string());
-            return vec;
+            return;
         }
 
         let mut next_talon: Option<usize> = None;
@@ -255,7 +255,7 @@ impl Deck {
         }
         // no point in looking
         if next_talon.is_some() && self.playable() < 10 {
-            return vec;
+            return;
         }
         // can't pull the talon if it turns true
         let mut one_is_empty = false;
@@ -289,7 +289,7 @@ impl Deck {
                     // off move
                     vec.clear();
                     vec.push(Move::off(from, index));
-                    return vec;
+                    return;
                 }
 
                 let mut broken_sequence = 0;
@@ -363,7 +363,6 @@ impl Deck {
         if !one_is_empty && next_talon.is_some() {
             vec.push(Move::from_talon(next_talon.unwrap()));
         }
-        return vec;
     }
 
     pub fn explain_move(&self, m: &Move) -> () {
@@ -606,11 +605,13 @@ impl Deck {
         let mut seen = HashSet::new();
 
         let mut depth: i32 = 0;
+        let mut moves = vec![];
 
         loop {
             for i in 0..=5 {
                 for deck in &unvisited[i] {
-                    let moves = deck.get_moves();
+                    // reuse moves vector
+                    deck.get_moves(&mut moves);
 
                     for m in &moves {
                         let newdeck = Rc::new(deck.apply_move(m));
