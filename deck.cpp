@@ -8,15 +8,17 @@
 #include <QDebug>
 #include <iostream>
 
+static Deck *deckstore = 0;
+
 struct WeightedDeck
 {
     uchar left_talons;
-    int chaos;
-    int64_t id;
     uchar in_off;
     uchar free_plays;
     uchar playable;
-    Deck deck;
+    int32_t chaos;
+    int64_t id;
+    int32_t index;
 
     bool operator<(const WeightedDeck &rhs) const;
     void update(uint64_t hash);
@@ -24,12 +26,12 @@ struct WeightedDeck
 
 void WeightedDeck::update(uint64_t hash)
 {
-    left_talons = deck.leftTalons();
+    left_talons = deckstore[index].leftTalons();
     id = hash;
-    in_off = deck.inOff();
-    free_plays = deck.freePlays();
-    playable = deck.playableCards();
-    chaos = deck.chaos();
+    in_off = deckstore[index].inOff();
+    free_plays = deckstore[index].freePlays();
+    playable = deckstore[index].playableCards();
+    chaos = deckstore[index].chaos();
 }
 
 // smaller is better!
@@ -300,14 +302,20 @@ QString Deck::toString() const
 
 uint64_t Deck::id() const
 {
-    // TODO: ignore off
     uchar buffer[15 * MAX_CARDS];
+    size_t count = 0;
+    // we copy always one 0 between the piles to diff a row of empty piles
     for (int i = 0; i < 10; i++)
-        memcpy(buffer + i * MAX_CARDS, play[i].cardsPtr(), MAX_CARDS);
+    {
+        memcpy(buffer + count, play[i].cardsPtr(), play[i].cardCount() + 1);
+        count += play[i].cardCount() + 1;
+    }
     for (int i = 0; i < 5; i++)
-        memcpy(buffer + (i + 10) * MAX_CARDS, talon[i].cardsPtr(), MAX_CARDS);
-
-    return SpookyHash::Hash64(&buffer, 15 * MAX_CARDS, 1);
+    {
+        memcpy(buffer + count, talon[i].cardsPtr(), talon[i].cardCount() + 1);
+        count += talon[i].cardCount() + 1;
+    }
+    return SpookyHash::Hash64(&buffer, count, 1);
 }
 
 void Deck::assignLeftCards(QList<Card> &list)
@@ -350,9 +358,14 @@ int Deck::chaos() const
 
 int Deck::shortestPath(int cap, bool debug)
 {
+    qDebug() << "SIZE" << sizeof(Deck);
     int depth = 1;
     moves_index = 0;
 
+    if (!deckstore)
+    {
+        deckstore = (Deck *)malloc(sizeof(Deck) * cap * 6 * 30);
+    }
     Deck *unvisited = new Deck[6 * cap];
     int unvisited_count[6] = {0, 0, 0, 0, 0, 0};
     int unvisited_count_total = 0;
@@ -360,7 +373,11 @@ int Deck::shortestPath(int cap, bool debug)
 
     QSet<uint64_t> seen;
     const int max_new_unvisited = cap * 6 * 30;
-    WeightedDeck *new_unvisited = new WeightedDeck[max_new_unvisited];
+    WeightedDeck new_unvisited[max_new_unvisited];
+    for (int i = 0; i < max_new_unvisited; i++)
+    {
+        new_unvisited[i].index = i;
+    }
     int new_unvisited_counter = 0;
     QVector<Move> current_moves;
     while (true)
@@ -372,9 +389,10 @@ int Deck::shortestPath(int cap, bool debug)
             for (Move m : current_moves)
             {
                 //std::cout << deck->explainMove(m).toStdString() << std::endl;
-                unvisited[i].applyMove(m, new_unvisited[new_unvisited_counter].deck);
+                Deck &deck = deckstore[new_unvisited[new_unvisited_counter].index];
+                unvisited[i].applyMove(m, deck);
                 //std::cout << newdeck.toString().toStdString() << std::endl;
-                uint64_t hash = new_unvisited[new_unvisited_counter].deck.id();
+                uint64_t hash = deck.id();
                 if (!seen.contains(hash))
                 {
                     new_unvisited[new_unvisited_counter++].update(hash);
@@ -406,16 +424,16 @@ int Deck::shortestPath(int cap, bool debug)
             }
             if (new_unvisited[i].in_off == 104)
             {
-                memcpy(moves, new_unvisited[i].deck.moves, sizeof(Move) * MAX_MOVES);
-                moves_index = new_unvisited[i].deck.moves_index;
+                Deck &deck = deckstore[new_unvisited[i].index];
+                memcpy(moves, deck.moves, sizeof(Move) * MAX_MOVES);
+                moves_index = deck.moves_index;
                 delete[] unvisited;
-                delete[] new_unvisited;
                 return depth;
             }
             int lt = new_unvisited[i].left_talons;
             if (unvisited_count[lt] < cap)
             {
-                unvisited[unvisited_count_total++].update(new_unvisited[i].deck);
+                unvisited[unvisited_count_total++].update(deckstore[new_unvisited[i].index]);
                 unvisited_count[lt]++;
             }
         }
@@ -424,7 +442,6 @@ int Deck::shortestPath(int cap, bool debug)
         depth += 1;
     }
     delete[] unvisited;
-    delete[] new_unvisited;
     return -1 * depth;
 }
 

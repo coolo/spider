@@ -64,7 +64,7 @@ std::string Card::toString() const
 
 Suit Card::char2suit(char c)
 {
-    switch (c)
+    switch (std::toupper(c))
     {
     case 'S':
         return Spades;
@@ -82,7 +82,7 @@ Suit Card::char2suit(char c)
 
 Rank Card::char2rank(char c)
 {
-    switch (c)
+    switch (std::toupper(c))
     {
     case 'K':
         return King;
@@ -125,7 +125,7 @@ Card::Card(const std::string &token_)
     {
         token.erase(0, 1);
     }
-    if (token == "XX")
+    if (token == "XX" || token == "xx")
     {
         set_rank(None);
         set_suit(Spades);
