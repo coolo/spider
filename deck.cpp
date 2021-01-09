@@ -2,7 +2,7 @@
 #include "move.h"
 #include "pile.h"
 #include "card.h"
-#include "SpookyV2.h"
+#include "seahash.h"
 #include <QList>
 #include <QFile>
 #include <QDebug>
@@ -315,7 +315,7 @@ uint64_t Deck::id() const
         memcpy(buffer + count, talon[i].cardsPtr(), talon[i].cardCount() + 1);
         count += talon[i].cardCount() + 1;
     }
-    return SpookyHash::Hash64(&buffer, count, 1);
+    return sea_hash(&buffer, count, 1);
 }
 
 void Deck::assignLeftCards(QList<Card> &list)

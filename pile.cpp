@@ -1,5 +1,4 @@
 #include "pile.h"
-#include "SpookyV2.h"
 #include <QDebug>
 #include <QMap>
 

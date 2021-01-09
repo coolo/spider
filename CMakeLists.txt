@@ -12,7 +12,7 @@ add_executable(spider
     card.cpp
     pile.cpp
     deck.cpp
-    SpookyV2.cpp
+    seahash.cpp
 )
 
 target_link_libraries(spider Qt5::Core)
