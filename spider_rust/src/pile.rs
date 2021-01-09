@@ -1,16 +1,19 @@
 use crate::card::Card;
 use once_cell::sync::Lazy;
+use seahash;
 use std::cmp::Ordering;
 use std::mem::MaybeUninit;
 use std::rc::Rc;
+
+// the maximum number of cards in a pile (rounded on 8 bytes)
+// 104 is the theoretical maximum but in real life 40 is already
+// hard to construct - so pick something in between
+pub const MAX_CARDS: usize = 64;
 
 pub struct PileTree {
     children: [Option<Box<PileTree>>; 256],
     pile: Rc<Pile>,
 }
-
-// the empty one is always there
-static mut PILE_COUNT: u32 = 0;
 
 impl PileTree {
     fn nones() -> [Option<Box<PileTree>>; 256] {
@@ -25,14 +28,13 @@ impl PileTree {
     }
 
     pub fn new() -> PileTree {
-        let bytes = [0; 104];
+        let bytes = [0; MAX_CARDS];
         PileTree {
             children: PileTree::nones(),
             pile: Rc::new(Pile {
                 cards: bytes,
                 count: 0,
                 chaos: 0,
-                id: 0,
                 playable: 0,
             }),
         }
@@ -41,7 +43,7 @@ impl PileTree {
     #[inline]
     pub fn insert_pile(
         tree_p: &mut PileTree,
-        cards: &[u8; 104],
+        cards: &[u8; MAX_CARDS],
         count: usize,
         index_p: usize,
     ) -> Rc<Pile> {
@@ -59,19 +61,11 @@ impl PileTree {
                 break;
             }
         }
-        let pile_id = unsafe {
-            PILE_COUNT += 1;
-            if PILE_COUNT > (u16::MAX as u32) * 256 {
-                panic!("We have too many piles!");
-            }
-            PILE_COUNT
-        };
         let mut newpile = Pile {
             cards: *cards,
             count: index + 1,
             chaos: 0,
             playable: 0,
-            id: pile_id,
         };
         newpile.chaos = newpile.calculate_chaos();
         newpile.playable = newpile.calculate_playable();
@@ -96,8 +90,7 @@ impl PileTree {
 static mut PILE_TREE: Lazy<PileTree> = Lazy::new(|| PileTree::new());
 
 pub struct Pile {
-    id: u32,
-    cards: [u8; 104],
+    cards: [u8; MAX_CARDS],
     count: usize,
     chaos: u32,
     playable: u8,
@@ -141,12 +134,8 @@ impl PartialOrd for Pile {
 }
 
 impl Pile {
-    pub fn or_insert(cards: &[u8; 104], count: usize) -> Rc<Pile> {
+    pub fn or_insert(cards: &[u8; MAX_CARDS], count: usize) -> Rc<Pile> {
         unsafe { PileTree::insert_pile(&mut PILE_TREE, cards, count, 0) }
-    }
-
-    pub fn id(&self) -> u32 {
-        self.id
     }
 
     pub fn empty() -> Rc<Pile> {
@@ -189,7 +178,7 @@ impl Pile {
 
     pub fn parse(s: &str) -> Option<Rc<Pile>> {
         let mut count = 0;
-        let mut cards = [0; 104];
+        let mut cards = [0; MAX_CARDS];
         for card_string in s.split(' ') {
             if card_string.is_empty() {
                 continue;
@@ -296,6 +285,21 @@ impl Pile {
 
     pub fn chaos(&self) -> u32 {
         self.chaos
+    }
+
+    pub fn hash(&self, state: &mut seahash::State) {
+        let ptr = self.cards.as_ptr();
+        let mut offset: isize = 0;
+        // we need to make sure MAX_CARDS is more
+        let max_offset = (self.count + 1) as isize;
+
+        loop {
+            state.push(unsafe { (*(ptr.offset(offset) as *const u64)).to_le() });
+            offset += 8;
+            if offset >= max_offset {
+                break;
+            }
+        }
     }
 
     fn calculate_chaos(&self) -> u32 {
@@ -419,7 +423,7 @@ mod piletests {
         let pile3 = pile2.remove_cards(4);
         assert_eq!(pile3.to_string(), "|AS |3S |AS 6S");
         // we can repeat the operation with the same result
-        assert_eq!(pile1.remove_cards(5).id, pile2.id);
+        assert_eq!(pile1.remove_cards(5).to_string(), pile2.to_string());
     }
 
     #[test]

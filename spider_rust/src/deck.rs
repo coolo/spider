@@ -4,7 +4,6 @@ use crate::pile::Pile;
 use seahash;
 use std::cmp::Ordering;
 use std::collections::HashSet;
-use std::ptr;
 use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -17,7 +16,6 @@ pub struct Deck {
     off: Rc<Pile>,
     moves: [Move; MAX_MOVES],
     moves_index: usize,
-    hashbytes: [u8; 15 * 3],
 }
 
 #[derive(Clone)]
@@ -70,21 +68,7 @@ impl Ord for WeightedMove {
                 return ord;
             }
         }
-        // while it's tempting to order just by hash, this doesn't give reproducible
-        // behaviour between runs if the PileTrees differ (and as such the IDs)
-        for i in 0..5 {
-            let ord = self.deck.talon[i].cmp(&other.deck.talon[i]);
-            if ord != Ordering::Equal {
-                return ord;
-            }
-        }
-        for i in 0..10 {
-            let ord = self.deck.play[i].cmp(&other.deck.play[i]);
-            if ord != Ordering::Equal {
-                return ord;
-            }
-        }
-        Ordering::Equal
+        self.hash.cmp(&other.hash)
     }
 }
 
@@ -105,7 +89,19 @@ impl PartialOrd for WeightedMove {
 
 impl Deck {
     pub fn hash(&self) -> u64 {
-        seahash::hash(&self.hashbytes as &[u8])
+        let mut state = seahash::State::new(
+            0x16f11fe89b0d677c,
+            0xb480a793d8e6c86c,
+            0x6fe2e5aaf078ebc9,
+            0x14f994a4c5259381,
+        );
+        for i in 0..10 {
+            self.play[i].hash(&mut state)
+        }
+        for i in 0..5 {
+            self.talon[i].hash(&mut state)
+        }
+        state.finalize()
     }
 
     #[inline]
@@ -167,7 +163,6 @@ impl Deck {
             off: Pile::empty(),
             moves_index: 0,
             moves: [Move::invalid(); MAX_MOVES],
-            hashbytes: [0; 15 * 3],
         }
     }
 
@@ -194,21 +189,17 @@ impl Deck {
                     let parsed = Pile::parse(pile);
                     match parsed {
                         None => panic!("Failed to parse {}", pile),
-                        Some(pile) => {
-                            newdeck.set_hashbytes(index, &pile);
-                            match index {
-                                0..=9 => newdeck.play[index] = pile,
-                                10..=14 => newdeck.talon[index - 10] = pile,
-                                15 => newdeck.off = pile,
-                                _ => panic!("We went too far"),
-                            }
-                        }
+                        Some(pile) => match index {
+                            0..=9 => newdeck.play[index] = pile,
+                            10..=14 => newdeck.talon[index - 10] = pile,
+                            15 => newdeck.off = pile,
+                            _ => panic!("We went too far"),
+                        },
                     }
                 }
             }
             index += 1;
         }
-        newdeck.reorder_hashbytes();
 
         if index != 16 {
             panic!("Not all piles are parsed");
@@ -216,65 +207,15 @@ impl Deck {
         newdeck
     }
 
-    fn reorder_hashbytes(&mut self) {
-        if self.free_talons() != 5 {
-            return;
-        }
-        // reorder the piles
-        let mut hash_indeces = [
-            self.play[0].id(),
-            self.play[1].id(),
-            self.play[2].id(),
-            self.play[3].id(),
-            self.play[4].id(),
-            self.play[5].id(),
-            self.play[6].id(),
-            self.play[7].id(),
-            self.play[8].id(),
-            self.play[9].id(),
-        ];
-        hash_indeces.sort();
-        for index in 0..10 {
-            unsafe {
-                let t = std::mem::transmute::<u32, [u8; 4]>(hash_indeces[index]);
-                ptr::copy_nonoverlapping(
-                    t.as_ptr() as *const u8,
-                    self.hashbytes.as_mut_ptr().offset((index * 3) as isize),
-                    3,
-                );
-            }
-        }
-    }
-
-    fn set_hashbytes(&mut self, index: usize, pile: &Rc<Pile>) {
-        // we ignore off for hashing
-        if index == 15 {
-            return;
-        }
-
-        unsafe {
-            let t = std::mem::transmute::<u32, [u8; 4]>(pile.id());
-            ptr::copy_nonoverlapping(
-                t.as_ptr() as *const u8,
-                self.hashbytes.as_mut_ptr().offset((index * 3) as isize),
-                3,
-            );
-        }
-    }
-
     pub fn set_play(&mut self, index: usize, pile: Rc<Pile>) {
-        self.set_hashbytes(index, &pile);
         self.play[index] = pile;
-        self.reorder_hashbytes();
     }
 
     pub fn set_talon(&mut self, index: usize, pile: Rc<Pile>) {
-        self.set_hashbytes(index, &pile);
         self.talon[index] = pile;
     }
 
     pub fn set_off(&mut self, pile: Rc<Pile>) {
-        // no hash bytes
         self.off = pile;
     }
 
