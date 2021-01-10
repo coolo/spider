@@ -60,6 +60,7 @@ fn play_one_round(
     suits: usize,
     orig_filename: Option<&str>,
     debug: bool,
+    yaml: bool,
 ) -> bool {
     let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
     let mut deck = Deck::parse(&contents);
@@ -74,13 +75,25 @@ fn play_one_round(
     let mut mc = 0;
     let mut orig = deck.clone();
     orig.reset_moves();
+    if yaml { println!("moves:"); }
     for m in deck.win_moves() {
         won_decks.insert(orig.hash());
         if !m.is_off() {
             mc += 1;
         }
-        print!("Move {}: ", mc);
-        orig.explain_move(&m);
+        if yaml {
+           println!("  - from: {}", m.from());
+           println!("    to: {}", m.to());
+           println!("    index: {}", m.index());
+           if m.is_off() {
+              println!("    off: true"); }
+           if m.is_talon() {
+              println!("    talon: true"); }
+           println!("    number: {}", mc);
+        } else {
+           print!("Move {}: ", mc);
+           orig.explain_move(&m);
+        }
         orig = orig.apply_move(&m);
 
         if orig.top_card_unknown(m.from()) {
@@ -266,6 +279,11 @@ fn main() {
                 .help("Temporary file name"),
         )
         .arg(
+            Arg::with_name("yaml")
+                .long("yaml")
+                .help("Output moves as yaml"),
+        )
+        .arg(
             Arg::with_name("cap")
                 .long("cap")
                 .takes_value(true)
@@ -343,6 +361,7 @@ fn main() {
                 suits,
                 matches.value_of("orig"),
                 matches.is_present("debug"),
+                matches.is_present("yaml")
             ) {
                 break;
             }
