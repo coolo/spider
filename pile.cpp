@@ -124,3 +124,15 @@ int Pile::playableCards() const
     }
     return sequenceOf(at(cards[0] - 1).suit());
 }
+
+void Pile::updateHash(SeahashState &state) const
+{
+    const uchar *ptr = cards;
+    const uchar *max_offset = ptr + cardCount() + 1;
+
+    do
+    {
+        state.push(*((uint64_t *)ptr));
+        ptr += 8;
+    } while (ptr <= max_offset);
+}

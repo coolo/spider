@@ -3,6 +3,7 @@
 
 #include "card.h"
 #include <QList>
+#include "seahash.h"
 
 const int MAX_CARDS = 104;
 
@@ -29,6 +30,7 @@ public:
     const unsigned char *cardsPtr() const { return (const unsigned char *)cards; };
     int sequenceOf(Suit suit) const;
     int playableCards() const;
+    void updateHash(SeahashState &state) const;
 
 private:
     uchar cards[MAX_CARDS + 1];

@@ -302,20 +302,16 @@ QString Deck::toString() const
 
 uint64_t Deck::id() const
 {
-    uchar buffer[15 * MAX_CARDS];
-    size_t count = 0;
-    // we copy always one 0 between the piles to diff a row of empty piles
+    SeahashState s;
     for (int i = 0; i < 10; i++)
     {
-        memcpy(buffer + count, play[i].cardsPtr(), play[i].cardCount() + 1);
-        count += play[i].cardCount() + 1;
+        play[i].updateHash(s);
     }
     for (int i = 0; i < 5; i++)
     {
-        memcpy(buffer + count, talon[i].cardsPtr(), talon[i].cardCount() + 1);
-        count += talon[i].cardCount() + 1;
+        talon[i].updateHash(s);
     }
-    return sea_hash(&buffer, count, 1);
+    return s.finish();
 }
 
 void Deck::assignLeftCards(QList<Card> &list)
