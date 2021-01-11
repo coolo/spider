@@ -12,7 +12,8 @@ const Pile *Pile::query_or_insert(const unsigned char *cards, size_t count)
     if (search != pilemap.end())
         return search->second;
     Pile *p = new Pile;
-    memcpy(p->cards, cards, MAX_CARDS);
+    memcpy(p->cards, cards, count);
+    memset(p->cards + count, 0, MAX_CARDS - count);
     p->count = count;
     p->calculateChaos();
     p->m_hash = h;
@@ -40,7 +41,6 @@ const Pile *Pile::copyFrom(const Pile *from, int index) const
     {
         newcards[newcount++] = from->cards[i];
     }
-    memset(newcards + newcount, 0, MAX_CARDS - newcount);
     return query_or_insert(newcards, newcount);
 }
 
@@ -56,22 +56,27 @@ std::string Pile::toString() const
 
 const Pile *Pile::remove(int index) const
 {
-    unsigned char newcards[MAX_CARDS];
-    memcpy(newcards, cards, MAX_CARDS);
-    size_t newcount = count;
 
-    while (newcount > index)
-    {
-        newcards[newcount] = 0;
-        newcount--;
-    }
     if (index > 0)
     {
         Card c = at(index - 1);
-        c.set_faceup(true);
-        newcards[index - 1] = c.raw_value();
+        if (!c.is_faceup())
+        {
+            static unsigned char newcards[MAX_CARDS];
+            memcpy(newcards, cards, MAX_CARDS);
+            c.set_faceup(true);
+            newcards[index - 1] = c.raw_value();
+            return query_or_insert(newcards, index);
+        }
+        else
+        {
+            return query_or_insert(cards, index);
+        }
     }
-    return query_or_insert(newcards, newcount);
+    else
+    {
+        return query_or_insert(cards, 0);
+    }
 }
 
 const Pile *Pile::addCard(const Card &c) const
