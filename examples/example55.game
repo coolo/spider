@@ -1,0 +1,17 @@
+# random deal
+Play0: |8S |TS |2H |6H |9S 3H
+Play1: |5S |5H |7H |5H |6H AS
+Play2: |AS |6H |7H |JH |9S 7S
+Play3: |3S |9S |JH |2S |4H 2H
+Play4: |7S |4S |KH |2S 2H
+Play5: |AH |QS |2S |2H 4S
+Play6: |6S |QH |6S |QS 9S
+Play7: |JS |TS |KS |KS TH
+Play8: |KH |8H |9H |KS 9H
+Play9: |3H |8H |7H |8H 5H
+Deal0: 7S TH AS 5S QS 4H 6S TS 7H 3S
+Deal1: 5S 6S 4S 8S 3S 5S KS 7S 9H 9H
+Deal2: QH JS AH TS 3H JH 2S KH JS JH
+Deal3: 5H 8S 4H AH 4H 6H 3S AS 3H QH
+Deal4: QH JS KH 8S AH TH 8H TH QS 4S
+Off: 
