@@ -5,9 +5,9 @@ struct Move
 {
     bool off;
     bool talon;
-    int from;
-    int to;
-    int index;
+    unsigned char from;
+    unsigned char to;
+    unsigned char index;
     Move()
     {
         talon = false;
@@ -28,10 +28,12 @@ struct Move
     {
         return Move(false, true, talon, 0, 0);
     }
-    static Move toOff(int from, int index) {
+    static Move toOff(int from, int index)
+    {
         return Move(true, false, from, 0, index);
     }
-    static Move regular(int from, int to, int index) {
+    static Move regular(int from, int to, int index)
+    {
         return Move(false, false, from, to, index);
     }
 };

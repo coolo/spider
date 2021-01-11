@@ -55,14 +55,13 @@ uint64_t SeahashState::finish() const
   return diffuse(r1);
 }
 
-uint64_t sea_hash(const void *key, int len, uint32_t seed)
+uint64_t sea_hash(const void *key, int len)
 {
   uint64_t a, b, c, d;
-  uint64_t s = seed;
   uint64_t *p;
   unsigned char pad[8] = {0};
 
-  a = 0x16f11fe89b0d677cULL ^ s;
+  a = 0x16f11fe89b0d677cULL;
   b = 0xb480a793d8e6c86cULL;
   c = 0x6fe2e5aaf078ebc9ULL;
   d = 0x14f994a4c5259381ULL;

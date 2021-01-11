@@ -34,6 +34,7 @@ int main(int argc, char **argv)
 
     QTextStream ts(&file);
     Deck d;
+    d.makeEmpty();
     QList<Card> required;
     int game_type = 2;
     for (int suit = 0; suit < 4; suit++)
@@ -117,6 +118,7 @@ int main(int argc, char **argv)
     std::random_shuffle(required.begin(), required.end());
     srand(time(0));
     d.assignLeftCards(required);
+
     if (!required.empty())
     {
         for (int i = 0; i < required.size(); i++)
@@ -134,8 +136,7 @@ int main(int argc, char **argv)
         qDebug() << "WON";
         int counter = 1;
 
-        Deck orig;
-        orig = d;
+        Deck orig = d;
         for (Move m : d.getWinMoves())
         {
             //std::cout << orig.toString().toStdString() << std::endl;

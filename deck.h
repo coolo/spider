@@ -16,9 +16,11 @@ private:
 public:
     Deck()
     {
+        // leaving the pointers stale on purpose
+        // for performance
     }
 
-    void update(const Deck &);
+    void update(const Deck *);
     void getMoves(QVector<Move> &moves) const;
     QVector<Move> getWinMoves() const;
     QString toString() const;
@@ -34,11 +36,12 @@ public:
     int playableCards() const;
     int inOff() const;
     int freePlays() const;
+    void makeEmpty();
 
 private:
-    Pile play[10];
-    Pile talon[5];
-    Pile off;
+    const Pile *play[10];
+    const Pile *talon[5];
+    const Pile *off;
     Move moves[MAX_MOVES];
     int moves_index;
 };

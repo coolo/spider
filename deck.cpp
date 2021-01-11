@@ -85,7 +85,7 @@ void Deck::getMoves(QVector<Move> &moves) const
     int next_talon = -1;
     for (int i = 0; i < 5; i++)
     {
-        if (!talon[i].empty())
+        if (!talon[i]->empty())
         {
             next_talon = i;
             break;
@@ -97,28 +97,28 @@ void Deck::getMoves(QVector<Move> &moves) const
     for (; from < 10; from++)
     {
         //qDebug() << "Play" << piles[from]->toString();
-        if (play[from].empty())
+        if (play[from]->empty())
         {
             one_is_empty = true;
             continue;
         }
 
-        int index = play[from].cardCount() - 1;
-        Suit top_suit = play[from].at(index).suit();
-        int top_rank = int(play[from].at(index).rank()) - 1;
+        int index = play[from]->cardCount() - 1;
+        Suit top_suit = play[from]->at(index).suit();
+        int top_rank = int(play[from]->at(index).rank()) - 1;
 
         while (index >= 0)
         {
-            Card current = play[from].at(index);
+            Card current = play[from]->at(index);
             if (!current.is_faceup())
                 break;
             if (current.suit() != top_suit)
                 break;
             if (top_rank + 1 != current.rank())
                 break;
-            top_rank = play[from].at(index).rank();
+            top_rank = play[from]->at(index).rank();
 
-            if (play[from].cardCount() - index == 13)
+            if (play[from]->cardCount() - index == 13)
             {
                 moves.clear();
                 moves.append(Move::toOff(from, index));
@@ -127,10 +127,10 @@ void Deck::getMoves(QVector<Move> &moves) const
             int broken_sequence = 0;
             if (index > 0)
             {
-                Card next_card = play[from].at(index - 1);
+                Card next_card = play[from]->at(index - 1);
                 if (current.inSequenceTo(next_card))
                 {
-                    broken_sequence = play[from].cardCount() - index;
+                    broken_sequence = play[from]->cardCount() - index;
                 }
             }
             bool moved_to_empty = false;
@@ -139,16 +139,16 @@ void Deck::getMoves(QVector<Move> &moves) const
                 if (to == from)
                     continue;
                 //qDebug() << "trying to move " << (piles[from]->cardCount() - index) << " from " << from << " to " << to;
-                int to_count = play[to].cardCount();
+                int to_count = play[to]->cardCount();
                 if (to_count > 0)
                 {
-                    Card top_card = play[to].at(to_count - 1);
+                    Card top_card = play[to]->at(to_count - 1);
                     if (top_card.rank() != top_rank + 1)
                         continue;
                     // make sure we only enlarge sequences
                     if (broken_sequence > 0)
                     {
-                        if (play[to].sequenceOf(top_suit) + broken_sequence <= play[from].sequenceOf(top_suit))
+                        if (play[to]->sequenceOf(top_suit) + broken_sequence <= play[from]->sequenceOf(top_suit))
                         {
                             continue;
                         }
@@ -191,15 +191,15 @@ void Deck::getMoves(QVector<Move> &moves) const
     }
 }
 
-void Deck::update(const Deck &other)
+void Deck::update(const Deck *other)
 {
-    memcpy(moves, other.moves, sizeof(Move) * MAX_MOVES);
-    moves_index = other.moves_index;
+    memcpy(moves, other->moves, sizeof(Move) * MAX_MOVES);
+    moves_index = other->moves_index;
     for (int i = 0; i < 10; i++)
-        play[i].clone(other.play[i]);
+        play[i] = other->play[i];
     for (int i = 0; i < 5; i++)
-        talon[i].clone(other.talon[i]);
-    off.clone(other.off);
+        talon[i] = other->talon[i];
+    off = other->off;
 }
 
 QVector<Move> Deck::getWinMoves() const
@@ -222,17 +222,17 @@ QString Deck::explainMove(Move m)
     {
         return QString("Move a sequence from %1 to the off").arg(m.from + 1);
     }
-    std::string fromCard = play[m.from].at(m.index).toString();
+    std::string fromCard = play[m.from]->at(m.index).toString();
     std::string toCard = "Empty";
-    if (play[m.to].cardCount() > 0)
-        toCard = play[m.to].at(play[m.to].cardCount() - 1).toString();
-    return QString("Move %1 cards from %2 to %3 - %4->%5").arg(play[m.from].cardCount() - m.index).arg(m.from + 1).arg(m.to + 1).arg(QString::fromStdString(fromCard)).arg(QString::fromStdString(toCard));
+    if (play[m.to]->cardCount() > 0)
+        toCard = play[m.to]->at(play[m.to]->cardCount() - 1).toString();
+    return QString("Move %1 cards from %2 to %3 - %4->%5").arg(play[m.from]->cardCount() - m.index).arg(m.from + 1).arg(m.to + 1).arg(QString::fromStdString(fromCard)).arg(QString::fromStdString(toCard));
 }
 
 void Deck::applyMove(const Move &m, Deck &newdeck, bool stop)
 {
     // newdeck could be this - but no worries
-    newdeck = *this;
+    newdeck.update(this);
     newdeck.moves[moves_index] = m;
     newdeck.moves_index = moves_index + 1;
 
@@ -241,30 +241,30 @@ void Deck::applyMove(const Move &m, Deck &newdeck, bool stop)
 
         for (int to = 0; to < 10; to++)
         {
-            Card c = newdeck.talon[m.from].at(to);
+            Card c = newdeck.talon[m.from]->at(to);
             c.set_faceup(true);
-            newdeck.play[to].addCard(c);
+            newdeck.play[to] = newdeck.play[to]->addCard(c);
         }
         // empty pile
-        newdeck.talon[m.from].clear();
+        newdeck.talon[m.from] = Pile::createEmpty();
     }
     else if (m.off)
     {
-        Card c = newdeck.play[m.from].at(newdeck.play[m.from].cardCount() - 13);
-        newdeck.off.addCard(c);
-        newdeck.play[m.from].remove(m.index);
+        Card c = newdeck.play[m.from]->at(newdeck.play[m.from]->cardCount() - 13);
+        newdeck.off = newdeck.off->addCard(c);
+        newdeck.play[m.from] = newdeck.play[m.from]->remove(m.index);
     }
     else
     {
-        newdeck.play[m.to].copyFrom(newdeck.play[m.from], m.index);
-        newdeck.play[m.from].remove(m.index);
-        if (stop && m.index > 0 && newdeck.play[m.from].at(m.index - 1).is_unknown())
+        newdeck.play[m.to] = newdeck.play[m.to]->copyFrom(newdeck.play[m.from], m.index);
+        newdeck.play[m.from] = newdeck.play[m.from]->remove(m.index);
+        if (stop && m.index > 0 && newdeck.play[m.from]->at(m.index - 1).is_unknown())
         {
             std::cout << "What's up?" << std::endl;
             std::string line;
             std::getline(std::cin, line);
             Card c(line);
-            newdeck.play[m.from].replaceAt(m.index - 1, c);
+            newdeck.play[m.from] = newdeck.play[m.from]->replaceAt(m.index - 1, c);
             QFile file("tmp");
             file.open(QIODevice::WriteOnly);
             file.write(newdeck.toString().toUtf8());
@@ -281,20 +281,20 @@ QString Deck::toString() const
     for (int i = 0; i < 10; i++)
     {
         ret += QString("Play%1:").arg(i);
-        ret += QString::fromStdString(play[i].toString());
+        ret += QString::fromStdString(play[i]->toString());
         ret += QStringLiteral("\n");
     }
 
     for (int i = 0; i < 5; i++)
     {
         ret += QString("Deal%1:").arg(i);
-        ret += QString::fromStdString(talon[i].toString());
+        ret += QString::fromStdString(talon[i]->toString());
         ret += QStringLiteral("\n");
         counter++;
     }
 
     ret += "Off:";
-    ret += QString::fromStdString(off.toString());
+    ret += QString::fromStdString(off->toString());
     ret += QStringLiteral("\n");
 
     return ret;
@@ -305,11 +305,11 @@ uint64_t Deck::id() const
     SeahashState s;
     for (int i = 0; i < 10; i++)
     {
-        play[i].updateHash(s);
+        s.push(play[i]->hash());
     }
     for (int i = 0; i < 5; i++)
     {
-        talon[i].updateHash(s);
+        s.push(talon[i]->hash());
     }
     return s.finish();
 }
@@ -317,9 +317,9 @@ uint64_t Deck::id() const
 void Deck::assignLeftCards(QList<Card> &list)
 {
     for (int i = 0; i < 10; i++)
-        play[i].assignLeftCards(list);
+        play[i] = play[i]->assignLeftCards(list);
     for (int i = 0; i < 5; i++)
-        talon[i].assignLeftCards(list);
+        talon[i] = talon[i]->assignLeftCards(list);
 }
 
 int Deck::leftTalons() const
@@ -327,7 +327,7 @@ int Deck::leftTalons() const
     int talons = 0;
     for (int i = 0; i < 5; i++)
     {
-        if (!talon[i].empty())
+        if (!talon[i]->empty())
         {
             talons++;
         }
@@ -340,14 +340,7 @@ int Deck::chaos() const
     int chaos = 0;
     for (int i = 0; i < 10; i++)
     {
-        chaos += play[i].chaos();
-    }
-    for (int i = 0; i < 5; i++)
-    {
-        if (!talon[i].empty())
-        {
-            chaos += 11;
-        }
+        chaos += play[i]->chaos();
     }
     return chaos;
 }
@@ -360,16 +353,17 @@ int Deck::shortestPath(int cap, bool debug)
 
     if (!deckstore)
     {
+        // do not call constructors!!
         deckstore = (Deck *)malloc(sizeof(Deck) * cap * 6 * 30);
     }
     Deck *unvisited = new Deck[6 * cap];
     int unvisited_count[6] = {0, 0, 0, 0, 0, 0};
     int unvisited_count_total = 0;
-    unvisited[unvisited_count_total++].update(*this);
+    unvisited[unvisited_count_total++].update(this);
 
     QSet<uint64_t> seen;
     const int max_new_unvisited = cap * 6 * 30;
-    WeightedDeck new_unvisited[max_new_unvisited];
+    WeightedDeck *new_unvisited = new WeightedDeck[max_new_unvisited];
     for (int i = 0; i < max_new_unvisited; i++)
     {
         new_unvisited[i].index = i;
@@ -380,15 +374,18 @@ int Deck::shortestPath(int cap, bool debug)
     {
         for (int i = 0; i < unvisited_count_total; i++)
         {
-            // std::cout << deck->toString().toStdString() << std::endl;
+
+            //std::cout << "\n\n\n======\n"
+            //          << unvisited[i].toString().toStdString() << std::endl;
             unvisited[i].getMoves(current_moves);
             for (Move m : current_moves)
             {
-                //std::cout << deck->explainMove(m).toStdString() << std::endl;
+                //std::cout << unvisited[i].explainMove(m).toStdString() << std::endl;
                 Deck &deck = deckstore[new_unvisited[new_unvisited_counter].index];
                 unvisited[i].applyMove(m, deck);
-                //std::cout << newdeck.toString().toStdString() << std::endl;
+                //std::cout << deck.toString().toStdString() << std::endl;
                 uint64_t hash = deck.id();
+
                 if (!seen.contains(hash))
                 {
                     new_unvisited[new_unvisited_counter++].update(hash);
@@ -429,7 +426,7 @@ int Deck::shortestPath(int cap, bool debug)
             int lt = new_unvisited[i].left_talons;
             if (unvisited_count[lt] < cap)
             {
-                unvisited[unvisited_count_total++].update(deckstore[new_unvisited[i].index]);
+                unvisited[unvisited_count_total++].update(&deckstore[new_unvisited[i].index]);
                 unvisited_count[lt]++;
             }
         }
@@ -438,6 +435,7 @@ int Deck::shortestPath(int cap, bool debug)
         depth += 1;
     }
     delete[] unvisited;
+    delete[] new_unvisited;
     return -1 * depth;
 }
 
@@ -445,11 +443,11 @@ void Deck::addCard(int index, const Card &c)
 {
     if (index < 10)
     {
-        play[index].addCard(c);
+        play[index] = play[index]->addCard(c);
     }
     else
     {
-        talon[index - 10].addCard(c);
+        talon[index - 10] = talon[index - 10]->addCard(c);
     }
 }
 
@@ -457,13 +455,13 @@ int Deck::playableCards() const
 {
     int result = 0;
     for (int i = 0; i < 10; i++)
-        result += play[i].playableCards();
+        result += play[i]->playableCards();
     return result;
 }
 
 int Deck::inOff() const
 {
-    return off.cardCount() * 13;
+    return off->cardCount() * 13;
 }
 
 int Deck::freePlays() const
@@ -471,7 +469,7 @@ int Deck::freePlays() const
     int result = 0;
     for (int i = 0; i < 10; i++)
     {
-        if (play[i].empty())
+        if (play[i]->empty())
         {
             result++;
         }
@@ -481,5 +479,14 @@ int Deck::freePlays() const
 
 bool Deck::isWon() const
 {
-    return off.cardCount() == 8;
+    return off->cardCount() == 8;
+}
+
+void Deck::makeEmpty()
+{
+    off = Pile::createEmpty();
+    for (int i = 0; i < 10; i++)
+        play[i] = Pile::createEmpty();
+    for (int i = 0; i < 5; i++)
+        talon[i] = Pile::createEmpty();
 }
