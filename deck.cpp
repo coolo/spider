@@ -75,7 +75,7 @@ bool WeightedDeck::operator<(const WeightedDeck &rhs) const
     return id < rhs.id;
 }
 
-void Deck::getMoves(QVector<Move> &moves) const
+void Deck::getMoves(std::vector<Move> &moves) const
 {
     moves.clear();
     if (moves_index >= MAX_MOVES - 1)
@@ -116,12 +116,12 @@ void Deck::getMoves(QVector<Move> &moves) const
                 break;
             if (top_rank + 1 != current.rank())
                 break;
-            top_rank = play[from]->at(index).rank();
+            top_rank = current.rank();
 
             if (play[from]->cardCount() - index == 13)
             {
                 moves.clear();
-                moves.append(Move::toOff(from, index));
+                moves.push_back(Move::toOff(from, index));
                 return;
             }
             int broken_sequence = 0;
@@ -179,7 +179,7 @@ void Deck::getMoves(QVector<Move> &moves) const
                     moved_to_empty = true;
                 }
 
-                moves.append(Move::regular(from, to, index));
+                moves.push_back(Move::regular(from, to, index));
             }
             index--;
         }
@@ -187,7 +187,7 @@ void Deck::getMoves(QVector<Move> &moves) const
 
     if (!one_is_empty && next_talon >= 0)
     {
-        moves.append(Move::fromTalon(next_talon));
+        moves.push_back(Move::fromTalon(next_talon));
     }
 }
 
@@ -410,7 +410,7 @@ int Deck::shortestPath(int cap, bool debug)
         new_unvisited[i].index = i;
     }
     int new_unvisited_counter = 0;
-    QVector<Move> current_moves;
+    std::vector<Move> current_moves;
     while (true)
     {
         for (int i = 0; i < unvisited_count_total; i++)

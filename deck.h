@@ -5,6 +5,7 @@
 #include "move.h"
 #include <QList>
 #include <QString>
+#include <vector>
 
 const int MAX_MOVES = 230;
 
@@ -21,7 +22,7 @@ public:
     }
 
     void update(const Deck *);
-    void getMoves(QVector<Move> &moves) const;
+    void getMoves(std::vector<Move> &moves) const;
     QVector<Move> getWinMoves() const;
     QString toString() const;
     QString explainMove(Move m);

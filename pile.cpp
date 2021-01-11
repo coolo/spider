@@ -3,7 +3,15 @@
 #include <QMap>
 #include <unordered_map>
 
-static std::unordered_map<uint64_t, Pile *> pilemap;
+struct HashHasher
+{
+    inline std::size_t operator()(const uint64_t &k) const
+    {
+        return std::size_t(k);
+    }
+};
+
+static std::unordered_map<uint64_t, Pile *, HashHasher> pilemap;
 
 const Pile *Pile::query_or_insert(const unsigned char *cards, size_t count)
 {
@@ -13,7 +21,6 @@ const Pile *Pile::query_or_insert(const unsigned char *cards, size_t count)
         return search->second;
     Pile *p = new Pile;
     memcpy(p->cards, cards, count);
-    memset(p->cards + count, 0, MAX_CARDS - count);
     p->count = count;
     p->calculateChaos();
     p->m_hash = h;
@@ -27,8 +34,7 @@ const Pile *Pile::query_or_insert(const unsigned char *cards, size_t count)
 
 const Pile *Pile::createEmpty()
 {
-    unsigned char newcards[MAX_CARDS];
-    memset(newcards, 0, MAX_CARDS);
+    unsigned char newcards[8];
     return query_or_insert(newcards, 0);
 }
 
@@ -109,12 +115,6 @@ void Pile::calculateChaos()
         }
         lastcard = current;
     }
-}
-
-void Pile::clear()
-{
-    memset(cards, 0, MAX_CARDS + 1);
-    count = 0;
 }
 
 const Pile *Pile::assignLeftCards(QList<Card> &list) const

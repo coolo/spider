@@ -27,7 +27,6 @@ public:
     int chaos() const { return m_chaos; }
     void calculateChaos();
     const Pile *assignLeftCards(QList<Card> &list) const;
-    void clear();
     int sequenceOf(Suit suit) const { return m_seqs[suit]; }
     int playableCards() const;
     uint64_t hash() const { return m_hash; }
