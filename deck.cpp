@@ -193,7 +193,7 @@ void Deck::getMoves(QVector<Move> &moves) const
 
 void Deck::update(const Deck *other)
 {
-    memcpy(moves, other->moves, sizeof(Move) * MAX_MOVES);
+    memcpy(moves, other->moves, sizeof(Move) * other->moves_index);
     moves_index = other->moves_index;
     for (int i = 0; i < 10; i++)
         play[i] = other->play[i];
@@ -341,6 +341,47 @@ int Deck::chaos() const
     for (int i = 0; i < 10; i++)
     {
         chaos += play[i]->chaos();
+    }
+    // per non-empty pile the chaos is at minimum 1
+    // but if the pile is connected, we substract one
+    // obvious wins are chaos 0
+    for (int i = 0; i < 10; i++)
+    {
+        if (play[i]->cardCount() == 0)
+        {
+            continue;
+        }
+        Card c1 = play[i]->at(0);
+
+        if (c1.rank() == 13)
+        {
+            chaos -= 1;
+            continue;
+        }
+
+        for (int j = 0; j < 10; j++)
+        {
+            if (j == i)
+            {
+                continue;
+            }
+            if (play[j]->empty())
+            {
+                continue;
+            }
+            // we don't need the suit here
+            if (c1.rank() == play[j]->at(play[j]->cardCount() - 1).rank() - 1)
+            {
+                chaos--;
+                break;
+            }
+        }
+    }
+    int fp = freePlays();
+    while (fp > 0 && chaos > 0)
+    {
+        fp--;
+        chaos--;
     }
     return chaos;
 }
