@@ -229,7 +229,8 @@ std::string Deck::explainMove(Move m)
     std::string toCard = "Empty";
     if (play[m.to]->cardCount() > 0)
         toCard = play[m.to]->at(play[m.to]->cardCount() - 1).toString();
-    snprintf(buffer, sizeof(buffer), "Move %d cards from %d to %d - %s->%s", play[m.from]->cardCount() - m.index, m.from + 1, m.to + 1, fromCard.c_str(), toCard.c_str());
+    snprintf(buffer, sizeof(buffer), "Move %d cards from %d to %d - %s->%s",
+             play[m.from]->cardCount() - m.index, m.from + 1, m.to + 1, fromCard.c_str(), toCard.c_str());
     return std::string(buffer);
 }
 
@@ -409,7 +410,9 @@ int Deck::shortestPath(int cap, bool debug)
     int unvisited_count_total = 0;
     unvisited[unvisited_count_total++].update(this);
 
-    std::unordered_set<uint64_t, HashHasher> seen;
+    const int number_seen = 2;
+    std::unordered_set<uint64_t, HashHasher> seen[number_seen];
+    int seen_index = 0;
     const int max_new_unvisited = cap * 6 * 30;
     WeightedDeck *new_unvisited = new WeightedDeck[max_new_unvisited];
     for (int i = 0; i < max_new_unvisited; i++)
@@ -422,7 +425,6 @@ int Deck::shortestPath(int cap, bool debug)
     {
         for (int i = 0; i < unvisited_count_total; i++)
         {
-
             //std::cout << "\n\n\n======\n"
             //          << unvisited[i].toString().toStdString() << std::endl;
             unvisited[i].getMoves(current_moves);
@@ -434,16 +436,21 @@ int Deck::shortestPath(int cap, bool debug)
                 //std::cout << deck.toString().toStdString() << std::endl;
                 uint64_t hash = deck.id();
 
-                if (seen.find(hash) == seen.end())
+                for (int s = 0; s < number_seen; s++)
                 {
-                    new_unvisited[new_unvisited_counter++].update(hash);
-                    seen.insert(hash);
-                    if (max_new_unvisited == new_unvisited_counter)
-                    {
-                        std::cerr << "Too many unvisted " << new_unvisited_counter << std::endl;
-                        exit(1);
-                    }
+                    if (seen[s].find(hash) != seen[s].end())
+                        goto nextmove;
                 }
+
+                new_unvisited[new_unvisited_counter++].update(hash);
+                seen[seen_index].insert(hash);
+                if (max_new_unvisited == new_unvisited_counter)
+                {
+                    std::cerr << "Too many unvisted " << new_unvisited_counter << std::endl;
+                    exit(1);
+                }
+            nextmove:
+                continue;
             }
         }
         for (int lt = 0; lt <= 5; lt++)
@@ -481,6 +488,9 @@ int Deck::shortestPath(int cap, bool debug)
 
         new_unvisited_counter = 0;
         depth += 1;
+        // rotate the seens through and erase the oldest one
+        seen_index = (seen_index + 1) % number_seen;
+        seen[seen_index].clear();
     }
     delete[] unvisited;
     delete[] new_unvisited;
