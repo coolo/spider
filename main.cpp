@@ -3,39 +3,81 @@
 #include "move.h"
 #include "pile.h"
 #include <time.h>
-#include <QCommandLineParser>
-#include <QDebug>
-#include <QFile>
-#include <QMessageLogger>
 #include <iostream>
+#include <fstream>
 #include <queue>
+#include <algorithm>
+#include <getopt.h>
+#include <cassert>
+
+bool removeOne(std::vector<Card> &cards, const Card &c)
+{
+    std::vector<Card>::iterator position = std::find(cards.begin(), cards.end(), c);
+    if (position != cards.end())
+    {
+        cards.erase(position);
+        return true;
+    }
+    else
+    {
+        if (!c.is_unknown())
+        {
+            std::cerr << "too many " << c.toString() << std::endl;
+            exit(1);
+        }
+        return false;
+    }
+}
 
 int main(int argc, char **argv)
 {
-    QCoreApplication app(argc, argv);
-    QCoreApplication::setApplicationName("spider");
-    QCoreApplication::setApplicationVersion("1.0");
+    int c;
+    int digit_optind = 0;
 
-    QCommandLineParser parser;
-    parser.setApplicationDescription("Solve Spider games");
-    parser.addHelpOption();
-    parser.addVersionOption();
-    parser.addPositionalArgument("game", "Description of game");
+    while (1)
+    {
+        int this_option_optind = optind ? optind : 1;
+        int option_index = 0;
+        static struct option long_options[] = {
+            {"debug", no_argument, 0, 'd'},
+            {0, 0, 0, 0}};
 
-    parser.process(app);
+        c = getopt_long(argc, argv, "d",
+                        long_options, &option_index);
+        if (c == -1)
+            break;
 
-    const QStringList args = parser.positionalArguments();
-    if (args.empty())
+        switch (c)
+        {
+        case 0:
+            printf("option %s", long_options[option_index].name);
+            if (optarg)
+                printf(" with arg %s", optarg);
+            printf("\n");
+            break;
+
+        case 'd':
+            printf("option d\n");
+            break;
+
+        case '?':
+            break;
+
+        default:
+            printf("?? getopt returned character code 0%o ??\n", c);
+        }
+    }
+
+    if (optind + 1 != argc)
+    {
+        printf("Require exactly one filename\n");
         return 1;
+    }
+    std::string filename = argv[optind++];
 
-    QFile file(args[0]);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
-        return 1;
-
-    QTextStream ts(&file);
     Deck d;
     d.makeEmpty();
-    QList<Card> required;
+    std::vector<Card> required;
     int game_type = 2;
     for (int suit = 0; suit < 4; suit++)
     {
@@ -51,64 +93,57 @@ int main(int argc, char **argv)
             {
                 c.set_suit(Spades);
             }
-            required.append(c);
-            required.append(c);
+            required.push_back(c);
+            required.push_back(c);
         }
     }
+
+    std::ifstream file(filename);
     int piles = -1;
-    while (!ts.atEnd())
+    while (file)
     {
-        QString token;
-        ts >> token;
-        if (token.startsWith("#"))
+        std::string token;
+        file >> token;
+        if (token.find('#') == 0)
         {
-            ts.readLine();
+            std::string line;
+            std::getline(file, line);
             continue;
         }
 
-        if (token.startsWith("Play") || token.startsWith("Deal") || token.startsWith("Off"))
+        if (token.find("Play") == 0 || token.find("Deal") == 0 || token.find("Off") == 0)
         {
             piles++;
         }
-        else if (!token.isEmpty())
+        else if (!token.empty())
         {
             if (token.length() == 6)
             {
-                Card first(token.mid(0, 2).toStdString());
-                Q_ASSERT(token.mid(2, 2) == "..");
+                Card first(token.substr(0, 2));
+                assert(token.mid(2, 2) == "..");
                 //if (token.mid(2,4))
-                Card last(token.mid(4, 2).toStdString());
+                Card last(token.substr(4, 2));
                 while (first.rank() >= last.rank())
                 {
-                    assert(required.contains(first));
-                    required.removeOne(first);
+                    removeOne(required, first);
                     d.addCard(piles, first);
                     first.set_rank(Rank(first.rank() - 1));
                 }
             }
             else
             {
-                Card c(token.toStdString());
+                Card c(token);
                 if (piles == 15)
                 {
                     for (int rank = Ace; rank <= King; rank++)
                     {
                         c.set_rank(Rank(rank));
-                        assert(required.contains(c));
-                        required.removeOne(c);
+                        removeOne(required, c);
                     }
                 }
                 else
                 {
-                    if (!c.is_unknown())
-                    {
-                        if (!required.contains(c))
-                        {
-                            std::cerr << "too many " << c.toString() << std::endl;
-                            exit(1);
-                        }
-                    }
-                    required.removeOne(c);
+                    removeOne(required, c);
                 }
                 d.addCard(piles, c);
             }
@@ -133,15 +168,13 @@ int main(int argc, char **argv)
     }
     if (d.shortestPath(500, false) > 0)
     {
-        qDebug() << "WON";
         int counter = 1;
-
         Deck orig = d;
-        for (Move m : d.getWinMoves())
+        for (const Move &m : d.getWinMoves())
         {
-            //std::cout << orig.toString().toStdString() << std::endl;
+            //std::cout << orig.toString() << std::endl;
             if (!m.off)
-                std::cout << QString("%1").arg(counter++).toStdString() << " " << orig.explainMove(m).toStdString() << std::endl;
+                std::cout << counter++ << " " << orig.explainMove(m) << std::endl;
             orig.applyMove(m, orig, true);
         }
     }

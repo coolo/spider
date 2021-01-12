@@ -1,6 +1,6 @@
 #include "card.h"
 #include <string>
-#include <QDebug>
+#include <iostream>
 
 std::string Card::toString() const
 {
@@ -33,7 +33,7 @@ std::string Card::toString() const
     default:
         if (rank() < 2 || rank() > 9)
         {
-            qFatal("rank is out of range");
+            printf("rank is out of range\n");
             exit(1);
         }
         ret += ('0' + rank());
@@ -54,7 +54,7 @@ std::string Card::toString() const
         ret += "C";
         break;
     default:
-        qDebug() << "Invalid suit " << suit();
+        std::cerr << "Invalid suit " << suit() << std::endl;
         exit(1);
     }
     if (!is_faceup())
@@ -75,7 +75,7 @@ Suit Card::char2suit(char c)
     case 'C':
         return Clubs;
     }
-    qDebug() << "No suit map for" << c;
+    std::cerr << "No suit map for " << c << std::endl;
     exit(1);
     return Spades;
 }
@@ -111,7 +111,7 @@ Rank Card::char2rank(char c)
     case '9':
         return Nine;
     }
-    qDebug() << "No rank for" << c;
+    std::cerr << "No rank for " << c << std::endl;
     exit(1);
     return Ace;
 }

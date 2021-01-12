@@ -3,8 +3,6 @@
 
 #include "pile.h"
 #include "move.h"
-#include <QList>
-#include <QString>
 #include <vector>
 
 const int MAX_MOVES = 230;
@@ -23,14 +21,14 @@ public:
 
     void update(const Deck *);
     void getMoves(std::vector<Move> &moves) const;
-    QVector<Move> getWinMoves() const;
-    QString toString() const;
-    QString explainMove(Move m);
+    std::vector<Move> getWinMoves() const;
+    std::string toString() const;
+    std::string explainMove(Move m);
     void applyMove(const Move &m, Deck &newdeck, bool stop = false);
     uint64_t id() const;
     int leftTalons() const;
     int chaos() const;
-    void assignLeftCards(QList<Card> &list);
+    void assignLeftCards(std::vector<Card> &list);
     int shortestPath(int cap, bool debug);
     void addCard(int index, const Card &c);
     bool isWon() const;

@@ -15,4 +15,4 @@ add_executable(spider
     seahash.cpp
 )
 
-target_link_libraries(spider Qt5::Core)
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g -DNDEBUG")

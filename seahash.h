@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 struct SeahashState
 {
     uint64_t a, b, c, d, written;
@@ -18,3 +20,11 @@ public:
 };
 
 uint64_t sea_hash(const void *key, int len);
+
+struct HashHasher
+{
+    inline std::size_t operator()(const uint64_t &k) const
+    {
+        return std::size_t(k);
+    }
+};

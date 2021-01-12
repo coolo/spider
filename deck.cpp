@@ -3,19 +3,20 @@
 #include "pile.h"
 #include "card.h"
 #include "seahash.h"
-#include <QList>
-#include <QFile>
-#include <QDebug>
 #include <iostream>
+#include <fstream>
+#include <cstring>
+#include <algorithm>
+#include <unordered_set>
 
 static Deck *deckstore = 0;
 
 struct WeightedDeck
 {
-    uchar left_talons;
-    uchar in_off;
-    uchar free_plays;
-    uchar playable;
+    unsigned char left_talons;
+    unsigned char in_off;
+    unsigned char free_plays;
+    unsigned char playable;
     int32_t chaos;
     int64_t id;
     int32_t index;
@@ -202,31 +203,34 @@ void Deck::update(const Deck *other)
     off = other->off;
 }
 
-QVector<Move> Deck::getWinMoves() const
+std::vector<Move> Deck::getWinMoves() const
 {
-    QVector<Move> res;
+    std::vector<Move> res;
     for (int i = 0; i < moves_index; i++)
     {
-        res.append(moves[i]);
+        res.emplace_back(moves[i]);
     }
     return res;
 }
 
-QString Deck::explainMove(Move m)
+std::string Deck::explainMove(Move m)
 {
+    char buffer[200];
     if (m.talon)
     {
         return "Draw another talon";
     }
     if (m.off)
     {
-        return QString("Move a sequence from %1 to the off").arg(m.from + 1);
+        snprintf(buffer, sizeof(buffer), "Move a sequence from %d to the off", m.from + 1);
+        return std::string(buffer);
     }
     std::string fromCard = play[m.from]->at(m.index).toString();
     std::string toCard = "Empty";
     if (play[m.to]->cardCount() > 0)
         toCard = play[m.to]->at(play[m.to]->cardCount() - 1).toString();
-    return QString("Move %1 cards from %2 to %3 - %4->%5").arg(play[m.from]->cardCount() - m.index).arg(m.from + 1).arg(m.to + 1).arg(QString::fromStdString(fromCard)).arg(QString::fromStdString(toCard));
+    snprintf(buffer, sizeof(buffer), "Move %d cards from %d to %d - %s->%s", play[m.from]->cardCount() - m.index, m.from + 1, m.to + 1, fromCard.c_str(), toCard.c_str());
+    return std::string(buffer);
 }
 
 void Deck::applyMove(const Move &m, Deck &newdeck, bool stop)
@@ -265,37 +269,41 @@ void Deck::applyMove(const Move &m, Deck &newdeck, bool stop)
             std::getline(std::cin, line);
             Card c(line);
             newdeck.play[m.from] = newdeck.play[m.from]->replaceAt(m.index - 1, c);
-            QFile file("tmp");
-            file.open(QIODevice::WriteOnly);
-            file.write(newdeck.toString().toUtf8());
-            file.close();
+            std::ofstream myfile;
+            myfile.open("tmp");
+            myfile << newdeck.toString();
+            myfile.close();
             exit(1);
         }
     }
 }
 
-QString Deck::toString() const
+std::string Deck::toString() const
 {
-    QString ret;
+    std::string ret;
+    char buffer[200];
     int counter = 0;
     for (int i = 0; i < 10; i++)
     {
-        ret += QString("Play%1:").arg(i);
-        ret += QString::fromStdString(play[i]->toString());
-        ret += QStringLiteral("\n");
+        snprintf(buffer, sizeof(buffer), "Play%d:", i);
+        ret += buffer;
+        ret += play[i]->toString();
+        ret += "\n";
     }
 
     for (int i = 0; i < 5; i++)
     {
-        ret += QString("Deal%1:").arg(i);
-        ret += QString::fromStdString(talon[i]->toString());
-        ret += QStringLiteral("\n");
+        snprintf(buffer, sizeof(buffer), "Deal%d:", i);
+        ret += buffer;
+
+        ret += talon[i]->toString();
+        ret += "\n";
         counter++;
     }
 
     ret += "Off:";
-    ret += QString::fromStdString(off->toString());
-    ret += QStringLiteral("\n");
+    ret += off->toString();
+    ret += "\n";
 
     return ret;
 }
@@ -314,7 +322,7 @@ uint64_t Deck::id() const
     return s.finish();
 }
 
-void Deck::assignLeftCards(QList<Card> &list)
+void Deck::assignLeftCards(std::vector<Card> &list)
 {
     for (int i = 0; i < 10; i++)
         play[i] = play[i]->assignLeftCards(list);
@@ -388,7 +396,6 @@ int Deck::chaos() const
 
 int Deck::shortestPath(int cap, bool debug)
 {
-    qDebug() << "SIZE" << sizeof(Deck);
     int depth = 1;
     moves_index = 0;
 
@@ -402,7 +409,7 @@ int Deck::shortestPath(int cap, bool debug)
     int unvisited_count_total = 0;
     unvisited[unvisited_count_total++].update(this);
 
-    QSet<uint64_t> seen;
+    std::unordered_set<uint64_t, HashHasher> seen;
     const int max_new_unvisited = cap * 6 * 30;
     WeightedDeck *new_unvisited = new WeightedDeck[max_new_unvisited];
     for (int i = 0; i < max_new_unvisited; i++)
@@ -427,7 +434,7 @@ int Deck::shortestPath(int cap, bool debug)
                 //std::cout << deck.toString().toStdString() << std::endl;
                 uint64_t hash = deck.id();
 
-                if (!seen.contains(hash))
+                if (seen.find(hash) == seen.end())
                 {
                     new_unvisited[new_unvisited_counter++].update(hash);
                     seen.insert(hash);
@@ -459,7 +466,7 @@ int Deck::shortestPath(int cap, bool debug)
             if (new_unvisited[i].in_off == 104)
             {
                 Deck &deck = deckstore[new_unvisited[i].index];
-                memcpy(moves, deck.moves, sizeof(Move) * MAX_MOVES);
+                memcpy(moves, deck.moves, sizeof(Move) * deck.moves_index);
                 moves_index = deck.moves_index;
                 delete[] unvisited;
                 return depth;

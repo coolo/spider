@@ -1,15 +1,6 @@
 #include "pile.h"
-#include <QDebug>
-#include <QMap>
 #include <unordered_map>
-
-struct HashHasher
-{
-    inline std::size_t operator()(const uint64_t &k) const
-    {
-        return std::size_t(k);
-    }
-};
+#include <cstring>
 
 static std::unordered_map<uint64_t, Pile *, HashHasher> pilemap;
 
@@ -117,7 +108,7 @@ void Pile::calculateChaos()
     }
 }
 
-const Pile *Pile::assignLeftCards(QList<Card> &list) const
+const Pile *Pile::assignLeftCards(std::vector<Card> &list) const
 {
     unsigned char newcards[MAX_CARDS];
     memcpy(newcards, cards, MAX_CARDS);
@@ -126,7 +117,8 @@ const Pile *Pile::assignLeftCards(QList<Card> &list) const
     {
         if (at(index).is_unknown())
         {
-            Card c = list.takeFirst();
+            Card c = list.front();
+            list.erase(list.begin());
             c.set_faceup(at(index).is_faceup());
             newcards[index] = c.raw_value();
         }
