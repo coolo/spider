@@ -33,6 +33,8 @@ int main(int argc, char **argv)
 {
     int c;
     int digit_optind = 0;
+    const int default_cap = 500;
+    int cap = default_cap;
 
     while (1)
     {
@@ -40,9 +42,10 @@ int main(int argc, char **argv)
         int option_index = 0;
         static struct option long_options[] = {
             {"debug", no_argument, 0, 'd'},
+	    {"cap", required_argument, 0, 'c'},
             {0, 0, 0, 0}};
 
-        c = getopt_long(argc, argv, "d",
+        c = getopt_long(argc, argv, "dc:",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -60,6 +63,11 @@ int main(int argc, char **argv)
             printf("option d\n");
             break;
 
+	case 'c':
+	    cap = atoi(optarg);
+	    if (cap == 0) cap = default_cap;
+	    break;
+
         case '?':
             break;
 
@@ -73,6 +81,7 @@ int main(int argc, char **argv)
         printf("Require exactly one filename\n");
         return 1;
     }
+
     std::string filename = argv[optind++];
 
     Deck d;
@@ -166,7 +175,7 @@ int main(int argc, char **argv)
         std::cerr << " ]" << std::endl;
         exit(1);
     }
-    if (d.shortestPath(500, false) > 0)
+    if (d.shortestPath(cap, false) > 0)
     {
         int counter = 1;
         Deck orig = d;
