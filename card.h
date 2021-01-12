@@ -55,7 +55,7 @@ struct Card
         }
         else
         {
-            value = value & !(1 << 6);
+            value = value & ~(1 << 6);
         }
     }
 
