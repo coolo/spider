@@ -2,7 +2,7 @@
 #include <unordered_map>
 #include <cstring>
 
-static std::unordered_map<uint64_t, Pile *, HashHasher> pilemap;
+thread_local std::unordered_map<uint64_t, Pile *, HashHasher> pilemap;
 
 const Pile *Pile::query_or_insert(const unsigned char *cards, size_t count)
 {

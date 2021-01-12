@@ -42,7 +42,7 @@ int main(int argc, char **argv)
         int option_index = 0;
         static struct option long_options[] = {
             {"debug", no_argument, 0, 'd'},
-	    {"cap", required_argument, 0, 'c'},
+            {"cap", required_argument, 0, 'c'},
             {0, 0, 0, 0}};
 
         c = getopt_long(argc, argv, "dc:",
@@ -63,10 +63,11 @@ int main(int argc, char **argv)
             printf("option d\n");
             break;
 
-	case 'c':
-	    cap = atoi(optarg);
-	    if (cap == 0) cap = default_cap;
-	    break;
+        case 'c':
+            cap = atoi(optarg);
+            if (cap == 0)
+                cap = default_cap;
+            break;
 
         case '?':
             break;

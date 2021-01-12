@@ -413,7 +413,7 @@ int Deck::shortestPath(int cap, bool debug)
     const int number_seen = 2;
     std::unordered_set<uint64_t, HashHasher> seen[number_seen];
     int seen_index = 0;
-    const int max_new_unvisited = cap * 6 * 30;
+    const int max_new_unvisited = cap * 6 * 20;
     WeightedDeck *new_unvisited = new WeightedDeck[max_new_unvisited];
     for (int i = 0; i < max_new_unvisited; i++)
     {
@@ -476,6 +476,7 @@ int Deck::shortestPath(int cap, bool debug)
                 memcpy(moves, deck.moves, sizeof(Move) * deck.moves_index);
                 moves_index = deck.moves_index;
                 delete[] unvisited;
+                delete[] new_unvisited;
                 return depth;
             }
             int lt = new_unvisited[i].left_talons;
