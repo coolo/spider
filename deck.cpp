@@ -8,6 +8,7 @@
 #include <cstring>
 #include <algorithm>
 #include <unordered_set>
+#include <cassert>
 
 static Deck *deckstore = 0;
 
@@ -83,6 +84,7 @@ void Deck::getMoves(std::vector<Move> &moves) const
     {
         return;
     }
+
     int next_talon = -1;
     for (int i = 0; i < 5; i++)
     {
@@ -234,7 +236,7 @@ std::string Deck::explainMove(Move m)
     return std::string(buffer);
 }
 
-void Deck::applyMove(const Move &m, Deck &newdeck, bool stop)
+void Deck::applyMove(const Move &m, Deck &newdeck, bool stop) const
 {
     // newdeck could be this - but no worries
     newdeck.update(this);
@@ -398,7 +400,6 @@ int Deck::chaos() const
 int Deck::shortestPath(int cap, bool debug)
 {
     int depth = 1;
-    moves_index = 0;
 
     if (!deckstore)
     {
@@ -428,7 +429,7 @@ int Deck::shortestPath(int cap, bool debug)
             //std::cout << "\n\n\n======\n"
             //          << unvisited[i].toString().toStdString() << std::endl;
             unvisited[i].getMoves(current_moves);
-            for (Move m : current_moves)
+            for (const Move &m : current_moves)
             {
                 //std::cout << unvisited[i].explainMove(m).toStdString() << std::endl;
                 Deck &deck = deckstore[new_unvisited[new_unvisited_counter].index];
@@ -467,7 +468,7 @@ int Deck::shortestPath(int cap, bool debug)
         {
             if (!printed)
             {
-                std::cout << "DEPTH " << depth << " " << new_unvisited_counter << " chaos: " << new_unvisited[i].chaos << " " << int(new_unvisited[i].playable) << std::endl;
+                //std::cout << "DEPTH " << depth << " " << new_unvisited_counter << " chaos: " << new_unvisited[i].chaos << " " << int(new_unvisited[i].playable) << std::endl;
                 printed = true;
             }
             if (new_unvisited[i].in_off == 104)
@@ -548,4 +549,102 @@ void Deck::makeEmpty()
         play[i] = Pile::createEmpty();
     for (int i = 0; i < 5; i++)
         talon[i] = Pile::createEmpty();
+    moves_index = 0;
+}
+
+static bool removeOne(std::vector<Card> &cards, const Card &c)
+{
+    std::vector<Card>::iterator position = std::find(cards.begin(), cards.end(), c);
+    if (position != cards.end())
+    {
+        cards.erase(position);
+        return true;
+    }
+    else
+    {
+        if (!c.is_unknown())
+        {
+            std::cerr << "too many " << c.toString() << std::endl;
+            exit(1);
+        }
+        return false;
+    }
+}
+
+std::vector<Card> Deck::parse(int game_type, const std::string &filename)
+{
+    makeEmpty();
+    std::vector<Card> required;
+
+    for (int suit = 0; suit < 4; suit++)
+    {
+        for (int r = Ace; r <= King; r++)
+        {
+            Card c;
+            c.set_rank(Rank(r));
+            if (game_type == 2)
+            {
+                c.set_suit(suit % 2 ? Hearts : Spades);
+            }
+            else
+            {
+                c.set_suit(Spades);
+            }
+            required.push_back(c);
+            required.push_back(c);
+        }
+    }
+
+    std::ifstream file(filename);
+    int piles = -1;
+    while (file)
+    {
+        std::string token;
+        file >> token;
+        if (token.find('#') == 0)
+        {
+            std::string line;
+            std::getline(file, line);
+            continue;
+        }
+
+        if (token.find("Play") == 0 || token.find("Deal") == 0 || token.find("Off") == 0)
+        {
+            piles++;
+        }
+        else if (!token.empty())
+        {
+            if (token.length() == 6)
+            {
+                Card first(token.substr(0, 2));
+                assert(token.substr(2, 2) == "..");
+                //if (token.mid(2,4))
+                Card last(token.substr(4, 2));
+                while (first.rank() >= last.rank())
+                {
+                    removeOne(required, first);
+                    addCard(piles, first);
+                    first.set_rank(Rank(first.rank() - 1));
+                }
+            }
+            else
+            {
+                Card c(token);
+                if (piles == 15)
+                {
+                    for (int rank = Ace; rank <= King; rank++)
+                    {
+                        c.set_rank(Rank(rank));
+                        removeOne(required, c);
+                    }
+                }
+                else
+                {
+                    removeOne(required, c);
+                }
+                addCard(piles, c);
+            }
+        }
+    }
+    return required;
 }
