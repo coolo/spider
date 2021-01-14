@@ -468,7 +468,7 @@ int Deck::shortestPath(int cap, bool debug)
         {
             if (!printed)
             {
-                //std::cout << "DEPTH " << depth << " " << new_unvisited_counter << " chaos: " << new_unvisited[i].chaos << " " << int(new_unvisited[i].playable) << std::endl;
+                std::cout << "DEPTH " << depth << " " << new_unvisited_counter << " chaos: " << new_unvisited[i].chaos << " " << int(new_unvisited[i].playable) << std::endl;
                 printed = true;
             }
             if (new_unvisited[i].in_off == 104)

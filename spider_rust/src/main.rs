@@ -75,26 +75,40 @@ fn play_one_round(
     let mut mc = 0;
     let mut orig = deck.clone();
     orig.reset_moves();
-    if yaml { println!("moves:"); }
+    if yaml {
+        println!("moves:");
+    }
     for m in deck.win_moves() {
         won_decks.insert(orig.hash());
         if !m.is_off() {
             mc += 1;
         }
         if yaml {
-           println!("  - from: {}", m.from());
-           println!("    to: {}", m.to());
-           println!("    index: {}", m.index());
-           if m.is_off() {
-              println!("    off: true"); }
-           if m.is_talon() {
-              println!("    talon: true"); }
-           println!("    number: {}", mc);
+            println!("  - from: {}", m.from());
+            println!("    to: {}", m.to());
+            println!("    index: {}", m.index());
+            if m.is_off() {
+                println!("    off: true");
+            }
+            if m.is_talon() {
+                println!("    talon: true");
+            }
+            println!("    number: {}", mc);
         } else {
-           print!("Move {}: ", mc);
-           orig.explain_move(&m);
+            print!("Move {}: {} ", mc, orig.explain_move(&m));
+            deck = deck.apply_move(&m);
         }
         orig = orig.apply_move(&m);
+        if !yaml {
+            println!(
+                " (Chaos {} Playable {} Off {} Free {} Talons {})",
+                orig.chaos(),
+                orig.playable(),
+                orig.in_off(),
+                orig.free_plays(),
+                orig.free_talons(),
+            );
+        }
 
         if orig.top_card_unknown(m.from()) {
             println!("What's up?");
@@ -255,9 +269,9 @@ fn pick(
             if !m.is_off() {
                 mc += 1;
             }
-            print!("Move {}: ", mc);
-            deck.explain_move(&m);
+            print!("Move {}: {}", mc, deck.explain_move(&m));
             deck = deck.apply_move(&m);
+            println!(" (Chaos {} Playable {})", deck.chaos(), deck.playable());
         }
     }
     best_total
@@ -362,7 +376,7 @@ fn main() {
                 suits,
                 matches.value_of("orig"),
                 matches.is_present("debug"),
-                matches.is_present("yaml")
+                matches.is_present("yaml"),
             ) {
                 break;
             }

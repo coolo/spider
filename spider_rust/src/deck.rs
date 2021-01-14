@@ -365,14 +365,12 @@ impl Deck {
         }
     }
 
-    pub fn explain_move(&self, m: &Move) -> () {
+    pub fn explain_move(&self, m: &Move) -> String {
         if m.is_talon() {
-            println!("Draw another talon");
-            return;
+            return format!("Draw another talon");
         }
         if m.is_off() {
-            println!("Move a sequence from {} to the off", m.from() + 1);
-            return;
+            return format!("Move a sequence from {} to the off", m.from() + 1);
         }
         // happy casting to avoid storing every index as 64 bits
         let from_pile = &self.play[m.from()];
@@ -387,9 +385,9 @@ impl Deck {
         let mut count = from_pile.count();
         count -= m.index();
         if self.result_of_tap(m.from()) == Some(*m) {
-            println!("Tap on {} ({}->{})", m.from() + 1, from_card, m.to() + 1);
+            return format!("Tap on {} ({}->{})", m.from() + 1, from_card, m.to() + 1);
         } else {
-            println!(
+            return format!(
                 "Move {} cards from {} to {} - {}->{}",
                 count,
                 m.from() + 1,
@@ -769,7 +767,8 @@ Deal3:
 Deal4: 
 Off: KS KH";
         let deck = Deck::parse(&text.to_string());
-        let moves = deck.get_moves();
+        let mut moves = vec![];
+        deck.get_moves(&mut moves);
         // pick 2H+AH to move to 3H
         assert_eq!(
             moves,
@@ -803,9 +802,10 @@ Deal3:
 Deal4: 
 Off: KS KH";
         let deck = Deck::parse(&text.to_string());
-        let moves = deck.get_moves();
+        let mut moves = vec![];
+        deck.get_moves(&mut moves);
         for m in &moves {
-            deck.explain_move(m);
+            println!("{}", deck.explain_move(m));
         }
         // pick 5H to move to 6H (among other, prune is gone)
         assert_eq!(
@@ -840,7 +840,8 @@ Deal3:
 Deal4: 
 Off: KS KH";
         let deck = Deck::parse(&text.to_string());
-        let moves = deck.get_moves();
+        let mut moves = vec![];
+        deck.get_moves(&mut moves);
         for m in &moves {
             deck.explain_move(m);
         }
@@ -867,7 +868,8 @@ Off: KS KH";
         Deal4: 
         Off: KS KH KH KS";
         let deck = Deck::parse(&text.to_string());
-        let moves = deck.get_moves();
+        let mut moves = vec![];
+        deck.get_moves(&mut moves);
         for m in &moves {
             deck.explain_move(&m);
             // all moves are to empty
@@ -897,7 +899,8 @@ Deal3:
 Deal4: 
 Off: KS KH KH KS";
         let deck = Deck::parse(&text.to_string());
-        let moves = deck.get_moves();
+        let mut moves = vec![];
+        deck.get_moves(&mut moves);
         // pick 9S to move to TS to uncover the other TS
         assert!(moves.contains(&Move::regular(4, 9, 3)));
     }
@@ -921,7 +924,8 @@ Deal3:
 Deal4: 
 Off: KS KH KH KS";
         let deck = Deck::parse(&text.to_string());
-        let moves = deck.get_moves();
+        let mut moves = vec![];
+        deck.get_moves(&mut moves);
         for m in &moves {
             deck.explain_move(m);
             // all moves are to empty
