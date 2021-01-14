@@ -409,7 +409,7 @@ fn main() {
                 std::process::exit(1);
             }
             x[0] /= MAX_CHAOS;
-            const MAX_UNDER: f64 = 60f64;
+            const MAX_UNDER: f64 = 100f64;
             if x[5] > MAX_UNDER {
                 println!("Under {} is larger than max", x[5]);
                 std::process::exit(1);
