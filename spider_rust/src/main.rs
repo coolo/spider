@@ -371,7 +371,7 @@ fn main() {
     deck.shuffle_unknowns(suits);
 
     if matches.is_present("slow") {
-        let mut nn = FeedForward::new(&[7, 7, 8, 8, 7, 1]);
+        let mut nn = FeedForward::new(&[7, 21, 31, 8, 1]);
         nn.activation(Tanh);
 
         let p = "samples.csv";
@@ -379,6 +379,7 @@ fn main() {
             let d = DataSet::from_csv(p).unwrap();
             nn.learning_rate(0.01).train(&d, 50_000);
         }
+       println!("Trained");
 
         let filenames: Vec<_> = matches.values_of("filename").unwrap().collect();
         for filename in filenames {
@@ -399,11 +400,14 @@ fn main() {
                 total: mc as u32,
             });
             let mut seen = HashSet::new();
+            let mut tries = 20_000;
 
             loop {
                 if pick(&mut heap, &mut seen, &mut nn, &deck) == 0 {
                     break;
                 }
+		tries -= 1;
+		if tries == 0 { println!("FAIL"); break; }
             }
         }
     } else {
