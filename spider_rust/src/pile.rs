@@ -36,6 +36,7 @@ impl PileTree {
                 count: 0,
                 chaos: 0,
                 playable: 0,
+                under: 0,
             }),
         }
     }
@@ -66,9 +67,11 @@ impl PileTree {
             count: index + 1,
             chaos: 0,
             playable: 0,
+            under: 0,
         };
         newpile.chaos = newpile.calculate_chaos();
         newpile.playable = newpile.calculate_playable();
+        newpile.under = newpile.calculate_under(0) as u32;
 
         tree.children[cards[index] as usize] = Some(Box::new(PileTree {
             pile: Rc::new(newpile),
@@ -94,6 +97,7 @@ pub struct Pile {
     count: usize,
     chaos: u32,
     playable: u8,
+    under: u32,
 }
 
 impl PartialEq for Pile {
@@ -287,6 +291,19 @@ impl Pile {
         self.chaos
     }
 
+    pub fn under(&self) -> u32 {
+        self.under
+    }
+
+    pub fn calculate_under(&self, ontop: usize) -> usize {
+        if self.count < 2 {
+            return self.count * ontop;
+        }
+        let count = self.sequence_of(self.at(self.count - 1).suit());
+        let newpile = self.remove_cards(self.count - count);
+        count * ontop + newpile.calculate_under(ontop + 1)
+    }
+
     pub fn hash(&self, state: &mut seahash::State) {
         let ptr = self.cards.as_ptr();
         let mut offset: isize = 0;
@@ -469,5 +486,15 @@ mod piletests {
         let pile = Pile::parse("|8S 7S 6S").expect("parsed");
         assert_eq!(pile.sequence_of(0), 2);
         assert_eq!(pile.sequence_of(1), 0);
+    }
+
+    #[test]
+    fn undertaken() {
+        // 4h..3h is free, 8s..6s are 3 cards with cost 1 (3), 3h is 1 card with cost 2 (3+2),
+        // 6s is 1 one card with cost 3 (3+2+3) - so we expect 8
+        let pile = Pile::parse("|6S |3H 8S..6s 4h..3h").expect("parsed");
+        assert_eq!(pile.calculate_under(0), 8);
+        let pile = Pile::parse("|8S 7S..6S").expect("parsed");
+        assert_eq!(pile.calculate_under(0), 1);
     }
 }

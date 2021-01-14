@@ -489,6 +489,14 @@ impl Deck {
         result
     }
 
+    pub fn under(&self) -> u32 {
+        let mut result: u32 = 0;
+        for i in 0..10 {
+            result += self.play[i].under();
+        }
+        result
+    }
+
     pub fn get_moves_index(&self) -> usize {
         self.moves_index
     }

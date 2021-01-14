@@ -101,12 +101,13 @@ fn play_one_round(
         orig = orig.apply_move(&m);
         if !yaml {
             println!(
-                " (Chaos {} Playable {} Off {} Free {} Talons {})",
+                " (Chaos {} Playable {} Off {} Free {} Talons {} Under {})",
                 orig.chaos(),
                 orig.playable(),
                 orig.in_off(),
                 orig.free_plays(),
                 orig.free_talons(),
+                orig.under()
             );
         }
 
