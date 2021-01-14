@@ -6,13 +6,26 @@ mod pile;
 use card::Card;
 use clap::{App, Arg};
 use deck::Deck;
+use neuroflow::activators::Type::Tanh;
+use neuroflow::data::DataSet;
+use neuroflow::FeedForward;
 use pile::Pile;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::collections::HashSet;
 use std::fs::File;
+use std::fs::OpenOptions;
 use std::io;
 use std::io::Write;
+use std::path::Path;
+
+fn estimate(deck: &Deck, nn: &mut FeedForward) -> u32 {
+    let vec: [f64; 7] = deck.nn_vector();
+    let res = (nn.calc(&vec)[0] * (deck::MAX_MOVES as f64)) as u32;
+    res
+    //return (res[0] * 300f64) as u32;
+    //return 300 - deck.in_off() + deck.under() + deck.chaos();
+}
 
 fn generate_deck(filename: &str) {
     let mut deck = Deck::empty();
@@ -192,27 +205,73 @@ impl Eq for WeightedDeck {}
 fn pick(
     heap: &mut BinaryHeap<WeightedDeck>,
     seen: &mut HashSet<u64>,
-    cap: usize,
-    best_before: usize,
+    nn: &mut FeedForward,
     orig: &Deck,
 ) -> usize {
     let wdeck = heap.pop();
     if wdeck.is_none() {
-        return 0;
+        std::process::exit(0);
     }
     let wdeck = wdeck.unwrap();
     let depth = wdeck.depth;
-    print!("Picked {}+{}={} (", depth, wdeck.moves, wdeck.total);
 
     let deck = wdeck.deck;
+    //print!("Picked {}+{} = {} (", depth, wdeck.moves, wdeck.total);
+
     if deck.is_won() {
-        println!("WON");
+        println!("WON)");
+        let moves = deck.win_moves();
+        let mut deck = orig.clone();
+        let mut mc = moves.len();
+        let mut cmoves = vec![];
+        deck.get_moves(&mut cmoves);
+        let a = deck.nn_vector();
+
+        let mut file = OpenOptions::new()
+            .write(true)
+            .append(true)
+            .create(true)
+            .open("samples.csv")
+            .unwrap();
+
+        writeln!(
+            file,
+            "{},{},{},{},{},{},{},-,{}",
+            a[0],
+            a[1],
+            a[2],
+            a[3],
+            a[4],
+            a[5],
+            cmoves.len(),
+            mc
+        )
+        .expect("Write");
+        for m in moves {
+            deck = deck.apply_move(&m);
+            mc -= 1;
+            deck.get_moves(&mut cmoves);
+            let a = deck.nn_vector();
+            writeln!(
+                file,
+                "{},{},{},{},{},{},{},-,{}",
+                a[0],
+                a[1],
+                a[2],
+                a[3],
+                a[4],
+                a[5],
+                cmoves.len(),
+                mc
+            )
+            .expect("Write");
+        }
+
         return 0;
     }
     let mut moves = vec![];
     deck.get_moves(&mut moves);
     let mut best_total = deck::MAX_MOVES;
-    let mut bestdeck: Option<Deck> = None;
 
     for m in &moves {
         //deck.explain_move(&m);
@@ -224,57 +283,23 @@ fn pick(
         seen.insert(hash);
         //println!("New\n{}", newdeck.to_string());
         let orig_move_index = newdeck.get_moves_index();
-        let won = newdeck.shortest_path(cap, false, None);
+        let won = estimate(&newdeck, nn);
 
-        if won.is_none() || won.unwrap() < 0 {
-            //println!("Move didn't win");
-        } else {
-            let won = won.unwrap() as u32;
-            //println!("Move gave {}", won);
-            print!("{} ", depth + won + 1);
-            if ((won + depth + 1) as usize) < best_total {
-                best_total = (won + depth + 1) as usize;
-                if best_total < best_before {
-                    bestdeck = Some(newdeck.clone());
-                }
-            }
-            newdeck.set_moves_index(orig_move_index);
-            heap.push(WeightedDeck {
-                deck: newdeck,
-                hash: hash,
-                depth: depth + 1,
-                moves: won as u32,
-                total: won + depth + 1,
-            });
+        //println!("Move gave {}", won);
+        //  print!("{} ", depth + won + 1);
+        if ((won + depth + 1) as usize) < best_total {
+            best_total = (won + depth + 1) as usize;
         }
+        newdeck.set_moves_index(orig_move_index);
+        heap.push(WeightedDeck {
+            deck: newdeck,
+            hash: hash,
+            depth: depth + 1,
+            moves: won as u32,
+            total: won + depth + 1,
+        });
     }
-    println!(")");
-    if best_total > wdeck.total as usize {
-        println!("There was a slip!");
-        let filename = format!("slip.{}-{}", best_total, wdeck.total);
-        let mut file = match File::create(&filename) {
-            Err(why) => panic!("couldn't create tmp: {}", why),
-            Ok(file) => file,
-        };
-
-        match file.write_all(deck.to_string().as_bytes()) {
-            Err(why) => panic!("couldn't write to {} {}", filename, why),
-            Ok(_) => println!("successfully wrote to {}", filename),
-        }
-    }
-    if let Some(deck) = bestdeck {
-        let moves = deck.win_moves();
-        let mut deck = orig.clone();
-        let mut mc = 0;
-        for m in moves {
-            if !m.is_off() {
-                mc += 1;
-            }
-            print!("Move {}: {}", mc, deck.explain_move(&m));
-            deck = deck.apply_move(&m);
-            println!(" (Chaos {} Playable {})", deck.chaos(), deck.playable());
-        }
-    }
+    //println!(")");
     best_total
 }
 
@@ -290,7 +315,7 @@ fn main() {
         .arg(
             Arg::with_name("filename")
                 .takes_value(true)
-                .multiple(false)
+                .multiple(true)
                 .required(true)
                 .help("Temporary file name"),
         )
@@ -346,27 +371,39 @@ fn main() {
     deck.shuffle_unknowns(suits);
 
     if matches.is_present("slow") {
-        let mut heap: BinaryHeap<WeightedDeck> = BinaryHeap::new();
-        let mc = deck.shortest_path(cap, false, None).unwrap();
-        deck.reset_moves();
-        assert!(mc > 0);
-        heap.push(WeightedDeck {
-            hash: deck.hash(),
-            deck: deck.clone(),
-            depth: 0,
-            moves: mc as u32,
-            total: mc as u32,
-        });
-        let mut seen = HashSet::new();
-        let mut best = deck::MAX_MOVES;
+        let mut nn = FeedForward::new(&[7, 7, 8, 8, 7, 1]);
+        nn.activation(Tanh);
 
-        loop {
-            let current_best = pick(&mut heap, &mut seen, cap, best, &deck);
-            if current_best == 0 {
-                break;
-            }
-            if best > current_best {
-                best = current_best;
+        let p = "samples.csv";
+        if Path::new(p).exists() {
+            let d = DataSet::from_csv(p).unwrap();
+            nn.learning_rate(0.01).train(&d, 50_000);
+        }
+
+        let filenames: Vec<_> = matches.values_of("filename").unwrap().collect();
+        for filename in filenames {
+            let contents =
+                fs::read_to_string(filename).expect("Something went wrong reading the file");
+            let mut deck = Deck::parse(&contents);
+            deck.shuffle_unknowns(suits);
+
+            let mut heap: BinaryHeap<WeightedDeck> = BinaryHeap::new();
+            let mc = deck.shortest_path(cap, false, None).unwrap();
+            deck.reset_moves();
+            assert!(mc > 0);
+            heap.push(WeightedDeck {
+                hash: deck.hash(),
+                deck: deck.clone(),
+                depth: 0,
+                moves: mc as u32,
+                total: mc as u32,
+            });
+            let mut seen = HashSet::new();
+
+            loop {
+                if pick(&mut heap, &mut seen, &mut nn, &deck) == 0 {
+                    break;
+                }
             }
         }
     } else {

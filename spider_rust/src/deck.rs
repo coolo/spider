@@ -721,6 +721,19 @@ impl Deck {
         self.play[play] = new;
     }
 
+    pub fn nn_vector(&self) -> [f64; 7] {
+        let mut moves = vec![];
+        self.get_moves(&mut moves);
+        [
+            self.chaos() as f64,
+            self.playable() as f64 / 104.,
+            self.in_off() as f64 / 104.,
+            self.free_plays() as f64 / 10.,
+            self.free_talons() as f64 / 5.,
+            self.under() as f64,
+            moves.len() as f64,
+        ]
+    }
     // for test cases
     #[allow(dead_code)]
     pub fn compare(&self, other: &Deck) -> Ordering {
