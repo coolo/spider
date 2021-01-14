@@ -18,7 +18,6 @@ use std::fs::File;
 use std::fs::OpenOptions;
 use std::io;
 use std::io::Write;
-use std::path::Path;
 
 fn estimate(deck: &Deck, nn: &mut FeedForward) -> u32 {
     let vec: [f64; 7] = deck.nn_vector();
@@ -207,6 +206,7 @@ fn pick(
     seen: &mut HashSet<u64>,
     nn: &mut FeedForward,
     orig: &Deck,
+    samples_filename: &str,
 ) -> usize {
     let wdeck = heap.pop();
     if wdeck.is_none() {
@@ -231,7 +231,7 @@ fn pick(
             .write(true)
             .append(true)
             .create(true)
-            .open("samples.csv")
+            .open(samples_filename)
             .unwrap();
 
         writeln!(
@@ -349,7 +349,13 @@ fn main() {
         .arg(
             Arg::with_name("slow")
                 .long("slow")
-                .help("Use A+ to search further"),
+                .help("Use AI to search further"),
+        )
+        .arg(
+            Arg::with_name("slow-output")
+                .long("slow-output")
+                .takes_value(true)
+                .help("Samples output"),
         )
         .get_matches();
 
@@ -435,9 +441,12 @@ fn main() {
             });
             let mut seen = HashSet::new();
             let mut tries = 20_000;
+            let output_file = matches
+                .value_of("slow-output")
+                .unwrap_or_else(|| "samples.csv");
 
             loop {
-                if pick(&mut heap, &mut seen, &mut nn, &deck) == 0 {
+                if pick(&mut heap, &mut seen, &mut nn, &deck, output_file) == 0 {
                     break;
                 }
                 tries -= 1;
