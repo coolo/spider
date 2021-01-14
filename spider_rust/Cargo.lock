@@ -269,6 +269,7 @@ name = "spider_rust"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "csv",
  "neuroflow",
  "once_cell",
  "seahash",

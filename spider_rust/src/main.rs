@@ -5,6 +5,7 @@ mod moves;
 mod pile;
 use card::Card;
 use clap::{App, Arg};
+use csv;
 use deck::Deck;
 use neuroflow::activators::Type::Tanh;
 use neuroflow::data::DataSet;
@@ -174,7 +175,6 @@ fn play_one_round(
 struct WeightedDeck {
     deck: Deck,
     depth: u32,
-    moves: u32,
     total: u32,
     hash: u64,
 }
@@ -219,8 +219,8 @@ fn pick(
     //print!("Picked {}+{} = {} (", depth, wdeck.moves, wdeck.total);
 
     if deck.is_won() {
-        println!("WON)");
         let moves = deck.win_moves();
+        println!("WON in {}", moves.len());
         let mut deck = orig.clone();
         let mut mc = moves.len();
         let mut cmoves = vec![];
@@ -295,7 +295,6 @@ fn pick(
             deck: newdeck,
             hash: hash,
             depth: depth + 1,
-            moves: won as u32,
             total: won + depth + 1,
         });
     }
@@ -371,15 +370,54 @@ fn main() {
     deck.shuffle_unknowns(suits);
 
     if matches.is_present("slow") {
-        let mut nn = FeedForward::new(&[7, 21, 31, 8, 1]);
-        nn.activation(Tanh);
+        let file_path = "samples.csv";
+        let mut file = csv::ReaderBuilder::new()
+            .has_headers(false)
+            .from_path(file_path)
+            .unwrap();
+        let mut data_set = DataSet::new();
+        let mut is_x: bool;
 
-        let p = "samples.csv";
-        if Path::new(p).exists() {
-            let d = DataSet::from_csv(p).unwrap();
-            nn.learning_rate(0.01).train(&d, 50_000);
+        for row in file.records() {
+            let records = row.unwrap();
+            let mut x: Vec<f64> = Vec::new();
+            let mut y: Vec<f64> = Vec::new();
+
+            is_x = true;
+
+            for i in 0..records.len() {
+                if records.get(i).unwrap() == "-" {
+                    is_x = false;
+                    continue;
+                } else if let Some(v) = records.get(i) {
+                    if is_x {
+                        x.push(v.parse().unwrap());
+                    } else {
+                        y.push(v.parse().unwrap());
+                    }
+                }
+            }
+            const MAX_CHAOS: f64 = 40f64;
+            if x[0] > MAX_CHAOS {
+                println!("Chaos {} is larger than max", x[0]);
+                std::process::exit(1);
+            }
+            x[0] /= MAX_CHAOS;
+            const MAX_UNDER: f64 = 60f64;
+            if x[5] > MAX_UNDER {
+                println!("Under {} is larger than max", x[5]);
+                std::process::exit(1);
+            }
+            x[5] /= MAX_UNDER;
+
+            y[0] /= deck::MAX_MOVES as f64;
+            data_set.push(&x, &y);
         }
-       println!("Trained");
+
+        let mut nn = FeedForward::new(&[7, 21, 31, 21, 11, 4, 1]);
+        nn.activation(Tanh);
+        nn.learning_rate(0.01).train(&data_set, 150_000);
+        println!("Trained");
 
         let filenames: Vec<_> = matches.values_of("filename").unwrap().collect();
         for filename in filenames {
@@ -389,15 +427,11 @@ fn main() {
             deck.shuffle_unknowns(suits);
 
             let mut heap: BinaryHeap<WeightedDeck> = BinaryHeap::new();
-            let mc = deck.shortest_path(cap, false, None).unwrap();
-            deck.reset_moves();
-            assert!(mc > 0);
             heap.push(WeightedDeck {
                 hash: deck.hash(),
                 deck: deck.clone(),
                 depth: 0,
-                moves: mc as u32,
-                total: mc as u32,
+                total: deck::MAX_MOVES as u32,
             });
             let mut seen = HashSet::new();
             let mut tries = 20_000;
@@ -406,8 +440,11 @@ fn main() {
                 if pick(&mut heap, &mut seen, &mut nn, &deck) == 0 {
                     break;
                 }
-		tries -= 1;
-		if tries == 0 { println!("FAIL"); break; }
+                tries -= 1;
+                if tries == 0 {
+                    println!("FAIL");
+                    break;
+                }
             }
         }
     } else {
