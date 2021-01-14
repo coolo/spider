@@ -7,6 +7,7 @@ use card::Card;
 use clap::{App, Arg};
 use csv;
 use deck::Deck;
+use neuroflow;
 use neuroflow::activators::Type::Tanh;
 use neuroflow::data::DataSet;
 use neuroflow::FeedForward;
@@ -207,16 +208,17 @@ fn pick(
     nn: &mut FeedForward,
     orig: &Deck,
     samples_filename: &str,
-) -> usize {
+) -> bool {
     let wdeck = heap.pop();
     if wdeck.is_none() {
+        println!("Out of options");
         std::process::exit(0);
     }
     let wdeck = wdeck.unwrap();
     let depth = wdeck.depth;
 
     let deck = wdeck.deck;
-    //print!("Picked {}+{} = {} (", depth, wdeck.moves, wdeck.total);
+   // println!("Picked {} = {} (", depth, wdeck.total);
 
     if deck.is_won() {
         let moves = deck.win_moves();
@@ -267,7 +269,7 @@ fn pick(
             .expect("Write");
         }
 
-        return 0;
+        return true;
     }
     let mut moves = vec![];
     deck.get_moves(&mut moves);
@@ -298,8 +300,7 @@ fn pick(
             total: won + depth + 1,
         });
     }
-    //println!(")");
-    best_total
+    false
 }
 
 fn main() {
@@ -351,6 +352,7 @@ fn main() {
                 .long("slow")
                 .help("Use AI to search further"),
         )
+        .arg(Arg::with_name("train").long("train").help("Read CSV"),)
         .arg(
             Arg::with_name("slow-output")
                 .long("slow-output")
@@ -420,10 +422,16 @@ fn main() {
             data_set.push(&x, &y);
         }
 
-        let mut nn = FeedForward::new(&[7, 21, 31, 21, 11, 4, 1]);
+        let mut nn : FeedForward = if matches.is_present("train") {
+          let mut nn =  FeedForward::new(&[7, 21, 31, 21, 11, 4, 1]);
         nn.activation(Tanh);
         nn.learning_rate(0.01).train(&data_set, 150_000);
         println!("Trained");
+        neuroflow::io::save(&nn, "samples.flow").unwrap();
+        nn
+        } else {
+         neuroflow::io::load("samples.flow").unwrap()
+        };
 
         let filenames: Vec<_> = matches.values_of("filename").unwrap().collect();
         for filename in filenames {
@@ -440,13 +448,13 @@ fn main() {
                 total: deck::MAX_MOVES as u32,
             });
             let mut seen = HashSet::new();
-            let mut tries = 30_000;
+            let mut tries = 3_000;
             let output_file = matches
                 .value_of("slow-output")
                 .unwrap_or_else(|| "samples.csv");
 
             loop {
-                if pick(&mut heap, &mut seen, &mut nn, &deck, output_file) == 0 {
+                if pick(&mut heap, &mut seen, &mut nn, &deck, output_file) {
                     break;
                 }
                 tries -= 1;
