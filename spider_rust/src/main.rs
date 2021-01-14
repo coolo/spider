@@ -440,7 +440,7 @@ fn main() {
                 total: deck::MAX_MOVES as u32,
             });
             let mut seen = HashSet::new();
-            let mut tries = 20_000;
+            let mut tries = 30_000;
             let output_file = matches
                 .value_of("slow-output")
                 .unwrap_or_else(|| "samples.csv");
