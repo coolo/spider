@@ -6,6 +6,7 @@ mod pile;
 use card::Card;
 use clap::{App, Arg};
 use deck::Deck;
+use deck::DeltaMove;
 use pile::Pile;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
@@ -98,19 +99,24 @@ fn play_one_round(
             print!("Move {}: {} ", mc, orig.explain_move(&m));
             deck = deck.apply_move(&m);
         }
-        orig = orig.apply_move(&m);
+        let dm = DeltaMove::new(&orig, &m);
+
+        let newdeck = orig.apply_move(&m);
         if !yaml {
             println!(
                 " (Chaos {} Playable {} Off {} Free {} Talons {} Under {})",
-                orig.chaos(),
-                orig.playable(),
-                orig.in_off(),
-                orig.free_plays(),
-                orig.free_talons(),
-                orig.under()
+                newdeck.chaos(),
+                newdeck.playable(),
+                newdeck.in_off(),
+                newdeck.free_plays(),
+                newdeck.free_talons(),
+                newdeck.under()
             );
         }
-
+        if !dm.any_good() {
+            println!("Not a good move:\n{} {:?}", orig.to_string(), dm);
+        }
+        orig = newdeck;
         if orig.top_card_unknown(m.from()) {
             println!("What's up?");
             let stdin = io::stdin();

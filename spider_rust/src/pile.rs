@@ -37,6 +37,7 @@ impl PileTree {
                 chaos: 0,
                 playable: 0,
                 under: 0,
+                hidden: 0,
             }),
         }
     }
@@ -68,10 +69,12 @@ impl PileTree {
             chaos: 0,
             playable: 0,
             under: 0,
+            hidden: 0,
         };
         newpile.chaos = newpile.calculate_chaos();
         newpile.playable = newpile.calculate_playable();
         newpile.under = newpile.calculate_under(0) as u32;
+        newpile.hidden = newpile.calculate_hidden();
 
         tree.children[cards[index] as usize] = Some(Box::new(PileTree {
             pile: Rc::new(newpile),
@@ -96,8 +99,9 @@ pub struct Pile {
     cards: [u8; MAX_CARDS],
     count: usize,
     chaos: u32,
-    playable: u8,
     under: u32,
+    playable: u8,
+    hidden: u8,
 }
 
 impl PartialEq for Pile {
@@ -293,6 +297,22 @@ impl Pile {
 
     pub fn under(&self) -> u32 {
         self.under
+    }
+
+    pub fn hidden(&self) -> u32 {
+        self.hidden as u32
+    }
+
+    pub fn calculate_hidden(&self) -> u8 {
+        if self.count < 2 {
+            return 0;
+        }
+        for i in 1..self.count {
+            if self.at(i).faceup() {
+                return (i - 1) as u8;
+            }
+        }
+        self.count as u8
     }
 
     pub fn calculate_under(&self, ontop: usize) -> usize {

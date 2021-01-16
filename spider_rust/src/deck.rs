@@ -440,12 +440,25 @@ impl Deck {
         return None;
     }
 
-    pub fn chaos(&self) -> u32 {
+    pub fn pile_chaos(&self) -> u32 {
         let mut result = 0;
-        // first sum up inner pile chaos
         for i in 0..10 {
             result += self.play[i].chaos();
         }
+        result
+    }
+
+    pub fn hidden(&self) -> u32 {
+        let mut result = 0;
+        for i in 0..10 {
+            result += self.play[i].hidden();
+        }
+        result
+    }
+
+    pub fn chaos(&self) -> u32 {
+        // first sum up inner pile chaos
+        let mut result = self.pile_chaos();
         // per non-empty pile the chaos is at minimum 1
         // but if the pile is connected, we substract one
         // obvious wins are chaos 0
@@ -727,6 +740,71 @@ impl Deck {
         let m1 = WeightedMove::from(Rc::new(self.clone()), self.hash());
         let m2 = WeightedMove::from(Rc::new(other.clone()), other.hash());
         m1.cmp(&m2)
+    }
+}
+
+#[derive(Debug)]
+pub struct DeltaMove {
+    chaos: i32,
+    under: i32,
+    playable: i32,
+    hidden: i32,
+    off: bool,
+    fp: bool,
+    ft: bool,
+    //  deck: Deck,
+    hash: u64,
+    //  m: Move,
+}
+
+impl DeltaMove {
+    pub fn any_good(&self) -> bool {
+        (self.chaos > 0)
+            || (self.under > 0)
+            || (self.playable > 0)
+            || (self.hidden > 0)
+            || self.off
+            || self.fp
+            || self.ft
+    }
+
+    pub fn new(orig: &Deck, m: &Move) -> Self {
+        let newdeck = orig.apply_move(&m);
+        DeltaMove {
+            chaos: orig.pile_chaos() as i32 - newdeck.pile_chaos() as i32,
+            under: orig.under() as i32 - newdeck.under() as i32,
+            off: newdeck.in_off() > orig.in_off(),
+            playable: newdeck.playable() as i32 - orig.playable() as i32,
+            fp: orig.free_plays() == 0 && newdeck.free_plays() > 0,
+            ft: newdeck.free_talons() > orig.free_talons(),
+            hidden: orig.hidden() as i32 - newdeck.hidden() as i32,
+            hash: newdeck.hash(),
+            //            deck: newdeck.clone(),
+            //            m: *m,
+        }
+    }
+}
+
+impl PartialEq for DeltaMove {
+    fn eq(&self, other: &Self) -> bool {
+        self.hash == other.hash
+    }
+}
+
+impl Eq for DeltaMove {}
+
+impl PartialOrd for DeltaMove {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for DeltaMove {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other
+            .chaos
+            .cmp(&self.chaos)
+            .then(other.under.cmp(&self.under))
     }
 }
 
