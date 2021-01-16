@@ -551,6 +551,27 @@ impl Deck {
         newdeck
     }
 
+    pub fn shortest_pile(&self) -> usize {
+        let mut result = self.play[0].count();
+        for i in 1..10 {
+            if result > self.play[i].count() {
+                result = self.play[i].count();
+            }
+        }
+        result
+    }
+
+    pub fn longest_sequence(&self) -> usize {
+        let mut result = self.play[0].top_sequence_length();
+        for i in 1..10 {
+            let sl = self.play[i].top_sequence_length();
+            if result < sl {
+                result = sl;
+            }
+        }
+        result
+    }
+
     pub fn full_deck(n_suits: usize) -> Vec<Card> {
         let mut cards = vec![];
         for suit in 0..4 {
@@ -750,6 +771,8 @@ pub struct DeltaMove {
     playable: i32,
     hidden: i32,
     off: bool,
+    shorter: bool,
+    longer: bool,
     fp: bool,
     ft: bool,
     //  deck: Deck,
@@ -763,6 +786,8 @@ impl DeltaMove {
             || (self.under > 0)
             || (self.playable > 0)
             || (self.hidden > 0)
+            || self.shorter
+            || self.longer
             || self.off
             || self.fp
             || self.ft
@@ -776,6 +801,8 @@ impl DeltaMove {
             off: newdeck.in_off() > orig.in_off(),
             playable: newdeck.playable() as i32 - orig.playable() as i32,
             fp: orig.free_plays() == 0 && newdeck.free_plays() > 0,
+            shorter: orig.shortest_pile() > newdeck.shortest_pile(),
+            longer: newdeck.longest_sequence() > orig.longest_sequence(),
             ft: newdeck.free_talons() > orig.free_talons(),
             hidden: orig.hidden() as i32 - newdeck.hidden() as i32,
             hash: newdeck.hash(),

@@ -437,6 +437,13 @@ impl Pile {
         }
         self.count() - index
     }
+
+    pub fn top_sequence_length(&self) -> usize {
+        if self.count < 2 {
+            return self.count;
+        }
+        self.sequence_of(self.at(self.count - 1).suit())
+    }
 }
 
 #[cfg(test)]
