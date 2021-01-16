@@ -348,8 +348,15 @@ impl Pile {
             if lastcard.value() == 0 {
                 result += 1;
             } else {
-                if !current.is_in_sequence_to(&lastcard) {
-                    result += 1;
+                if !lastcard.faceup() {
+                    result += 2;
+                } else {
+                    if lastcard.suit() != current.suit() {
+                        result += 1;
+                    }
+                    if lastcard.rank() != current.rank() + 1 {
+                        result += 1;
+                    }
                 }
             }
             lastcard = current;
@@ -481,13 +488,17 @@ mod piletests {
     #[test]
     fn chaos() {
         let pile = Pile::parse("|AS |3S |AS |6S |3H 8S").expect("parsed");
-        assert_eq!(pile.chaos(), 6);
+        assert_eq!(pile.chaos(), 11);
         let pile = Pile::parse("|TS 7S 6S").expect("parsed");
-        assert_eq!(pile.chaos(), 2);
+        assert_eq!(pile.chaos(), 3);
         let pile = Pile::parse("8S 7S 6S").expect("parsed");
         assert_eq!(pile.chaos(), 1);
         let pile = Pile::parse("8S 7H 6S").expect("parsed");
         assert_eq!(pile.chaos(), 3);
+        let pile = Pile::parse("8S 6S 7H").expect("parsed");
+        assert_eq!(pile.chaos(), 4);
+        let pile = Pile::parse("8S 7H 6H").expect("parsed");
+        assert_eq!(pile.chaos(), 2);
     }
 
     #[test]

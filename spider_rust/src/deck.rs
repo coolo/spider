@@ -1139,7 +1139,7 @@ Off: KS KS KS KS KH KH KH";
         Deal4: 
         Off: KS KH KH KS KS";
         let mut deck = Deck::parse(&text.to_string());
-        let res = deck.shortest_path(10, false, None);
+        let res = deck.shortest_path(7000, false, None);
         assert_eq!(res.expect("winnable"), 28);
     }
 
@@ -1164,7 +1164,7 @@ Off: KS KS KS KS KH KH KH";
         Off: KS KH KH KS KH KS";
         let mut deck = Deck::parse(&text.to_string());
         // win in 17 moves
-        let res = deck.shortest_path(10, false, None);
+        let res = deck.shortest_path(5000, false, None);
         assert_eq!(res.expect("winnable"), 17);
         /*
         let win_moves = deck.win_moves();
