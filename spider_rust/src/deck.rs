@@ -456,6 +456,14 @@ impl Deck {
         result
     }
 
+    pub fn order(&self) -> u8 {
+        let mut result = 0;
+        for i in 0..10 {
+            result += self.play[i].order();
+        }
+        result
+    }
+
     pub fn chaos(&self) -> u32 {
         // first sum up inner pile chaos
         let mut result = self.pile_chaos();
@@ -770,6 +778,7 @@ pub struct DeltaMove {
     under: i32,
     playable: i32,
     hidden: i32,
+    order: i32,
     off: bool,
     shorter: bool,
     longer: bool,
@@ -786,6 +795,7 @@ impl DeltaMove {
             || (self.under > 0)
             || (self.playable > 0)
             || (self.hidden > 0)
+            || (self.order > 0)
             || self.shorter
             || self.longer
             || self.off
@@ -798,6 +808,7 @@ impl DeltaMove {
         DeltaMove {
             chaos: orig.pile_chaos() as i32 - newdeck.pile_chaos() as i32,
             under: orig.under() as i32 - newdeck.under() as i32,
+            order: newdeck.order() as i32 - orig.order() as i32,
             off: newdeck.in_off() > orig.in_off(),
             playable: newdeck.playable() as i32 - orig.playable() as i32,
             fp: orig.free_plays() == 0 && newdeck.free_plays() > 0,
@@ -1139,7 +1150,7 @@ Off: KS KS KS KS KH KH KH";
         Deal4: 
         Off: KS KH KH KS KS";
         let mut deck = Deck::parse(&text.to_string());
-        let res = deck.shortest_path(7000, false, None);
+        let res = deck.shortest_path(20, false, None);
         assert_eq!(res.expect("winnable"), 28);
     }
 
@@ -1164,7 +1175,7 @@ Off: KS KS KS KS KH KH KH";
         Off: KS KH KH KS KH KS";
         let mut deck = Deck::parse(&text.to_string());
         // win in 17 moves
-        let res = deck.shortest_path(5000, false, None);
+        let res = deck.shortest_path(10, false, None);
         assert_eq!(res.expect("winnable"), 17);
         /*
         let win_moves = deck.win_moves();

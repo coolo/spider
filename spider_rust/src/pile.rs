@@ -38,6 +38,7 @@ impl PileTree {
                 playable: 0,
                 under: 0,
                 hidden: 0,
+                order: 0,
             }),
         }
     }
@@ -70,11 +71,13 @@ impl PileTree {
             playable: 0,
             under: 0,
             hidden: 0,
+            order: 0,
         };
         newpile.chaos = newpile.calculate_chaos();
         newpile.playable = newpile.calculate_playable();
         newpile.under = newpile.calculate_under(0) as u32;
         newpile.hidden = newpile.calculate_hidden();
+        newpile.order = newpile.calculate_order();
 
         tree.children[cards[index] as usize] = Some(Box::new(PileTree {
             pile: Rc::new(newpile),
@@ -102,6 +105,7 @@ pub struct Pile {
     under: u32,
     playable: u8,
     hidden: u8,
+    order: u8,
 }
 
 impl PartialEq for Pile {
@@ -348,20 +352,33 @@ impl Pile {
             if lastcard.value() == 0 {
                 result += 1;
             } else {
-                if !lastcard.faceup() {
-                    result += 2;
-                } else {
-                    if lastcard.suit() != current.suit() {
-                        result += 1;
-                    }
-                    if lastcard.rank() != current.rank() + 1 {
-                        result += 1;
-                    }
+                if !current.is_in_sequence_to(&lastcard) {
+                    result += 1;
                 }
             }
             lastcard = current;
         }
         result
+    }
+
+    fn calculate_order(&self) -> u8 {
+        if self.count < 2 {
+            return self.count as u8;
+        }
+        let mut result = 0;
+        let mut lastcard = self.at(0);
+        for i in 1..self.count {
+            let current = self.at(i);
+            if lastcard.faceup() && current.rank() + 1 == lastcard.rank() {
+                result += 1;
+            }
+            lastcard = current;
+        }
+        result
+    }
+
+    pub fn order(&self) -> u8 {
+        self.order
     }
 
     #[allow(dead_code)]
@@ -488,17 +505,13 @@ mod piletests {
     #[test]
     fn chaos() {
         let pile = Pile::parse("|AS |3S |AS |6S |3H 8S").expect("parsed");
-        assert_eq!(pile.chaos(), 11);
+        assert_eq!(pile.chaos(), 6);
         let pile = Pile::parse("|TS 7S 6S").expect("parsed");
-        assert_eq!(pile.chaos(), 3);
+        assert_eq!(pile.chaos(), 2);
         let pile = Pile::parse("8S 7S 6S").expect("parsed");
         assert_eq!(pile.chaos(), 1);
         let pile = Pile::parse("8S 7H 6S").expect("parsed");
         assert_eq!(pile.chaos(), 3);
-        let pile = Pile::parse("8S 6S 7H").expect("parsed");
-        assert_eq!(pile.chaos(), 4);
-        let pile = Pile::parse("8S 7H 6H").expect("parsed");
-        assert_eq!(pile.chaos(), 2);
     }
 
     #[test]
@@ -534,5 +547,15 @@ mod piletests {
         assert_eq!(pile.calculate_under(0), 8);
         let pile = Pile::parse("|8S 7S..6S").expect("parsed");
         assert_eq!(pile.calculate_under(0), 1);
+    }
+
+    #[test]
+    fn order() {
+        // only 7s+6s and 3h are on top of the right card
+        let pile = Pile::parse("|6S |3H 8S..6s 4h..3h").expect("parsed");
+        assert_eq!(pile.calculate_order(), 3);
+        // 6s and 5h are on top of the right card
+        let pile = Pile::parse("|8S 7S..6S 5h").expect("parsed");
+        assert_eq!(pile.calculate_order(), 2);
     }
 }
