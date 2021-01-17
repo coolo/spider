@@ -238,6 +238,15 @@ impl Deck {
         result
     }
 
+    fn next_talon(&self) -> Option<usize> {
+        for i in 0..5 {
+            if !self.talon[i].is_empty() {
+                return Some(i);
+            }
+        }
+        None
+    }
+
     pub fn get_moves(&self, vec: &mut Vec<Move>) {
         vec.clear();
 
@@ -245,14 +254,8 @@ impl Deck {
             //println!("Too deep {}", self.to_string());
             return;
         }
+        let next_talon = self.next_talon();
 
-        let mut next_talon: Option<usize> = None;
-        for i in 0..5 {
-            if !self.talon[i].is_empty() {
-                next_talon = Some(i);
-                break;
-            }
-        }
         // no point in looking
         if next_talon.is_some() && self.playable() < 10 {
             return;
@@ -518,6 +521,26 @@ impl Deck {
         result
     }
 
+    // how many talon cards will fall into sequence
+    pub fn talon_matches(&self) -> u8 {
+        if let Some(next_talon) = self.next_talon() {
+            let mut result = 0;
+            let next_talon = &self.talon[next_talon];
+            for i in 0..10 {
+                if self.play[i].count() == 0 {
+                    continue;
+                }
+                let current = self.play[i].at(self.play[i].count() - 1);
+                if next_talon.at(i).is_in_sequence_to(&current) {
+                    result += 1;
+                }
+            }
+            result
+        } else {
+            0
+        }
+    }
+
     pub fn get_moves_index(&self) -> usize {
         self.moves_index
     }
@@ -779,6 +802,7 @@ pub struct DeltaMove {
     playable: i32,
     hidden: i32,
     order: i32,
+    talon_matches: i32,
     off: bool,
     shorter: bool,
     longer: bool,
@@ -796,6 +820,7 @@ impl DeltaMove {
             || (self.playable > 0)
             || (self.hidden > 0)
             || (self.order > 0)
+            || (self.talon_matches > 0)
             || self.shorter
             || self.longer
             || self.off
@@ -816,6 +841,7 @@ impl DeltaMove {
             longer: newdeck.longest_sequence() > orig.longest_sequence(),
             ft: newdeck.free_talons() > orig.free_talons(),
             hidden: orig.hidden() as i32 - newdeck.hidden() as i32,
+            talon_matches: newdeck.talon_matches() as i32 - orig.talon_matches() as i32,
             hash: newdeck.hash(),
             //            deck: newdeck.clone(),
             //            m: *m,
@@ -1391,5 +1417,44 @@ Off: KH KS KH KS";
         let _deck2 = Deck::parse(&text.to_string());
         // deck1 is winnable in 8, deck2 in 7 - but it's hard to see
         //assert_eq!(deck2.compare(&deck1), Ordering::Greater);
+    }
+
+    #[test]
+    fn talon_matches() {
+        let text = "Play0: |TS |6S |5H |9H |8H JH..8H 9H
+                    Play1: JS..TS KH
+                    Play2: |QH |JH |4S |3H |AH 5H 4S..3S 9H QS
+                    Play3: |4H |8S |8S |2H 4H..3H 2S JS
+                    Play4: |QH |4H |6S |AH 6H 4S 3H..2H
+                    Play5: |6H |7H |TH |AS 7S KS KS..QS
+                    Play6: |6S |TH |8S 2H..AH JH 2S
+                    Play7: |AS |2S |9S KS KH 5H
+                    Play8: |7S |QH |JS |2H KS 7H 8S..4S
+                    Play9: |QS |3H 7H
+                    Deal0: 
+                    Deal1: 
+                    Deal2: |5H |7H |TH |TS |3S |5S |QS |7S |KH |KH
+                    Deal3: |AS |3S |5S |8H |QH |JS |4H |6H |AH |6H
+                    Deal4: |9S |5S |3S |AS |JH |9S |8H |9S |TS |2S
+                    Off:";
+        // now move 3h..2h from play4 to play8
+        assert_eq!(Deck::parse(&text.to_string()).talon_matches(), 1);
+        let text = "Play0: |TS |6S |5H |9H |8H JH..8H 9H
+                    Play1: JS..TS KH
+                    Play2: |QH |JH |4S |3H |AH 5H 4S..3S 9H QS
+                    Play3: |4H |8S |8S |2H 4H..3H 2S JS
+                    Play4: |QH |4H |6S |AH 6H 4S 
+                    Play5: |6H |7H |TH |AS 7S KS KS..QS
+                    Play6: |6S |TH |8S 2H..AH JH 2S
+                    Play7: |AS |2S |9S KS KH 5H
+                    Play8: |7S |QH |JS |2H KS 7H 8S..4S 3H..2H
+                    Play9: |QS |3H 7H
+                    Deal0: 
+                    Deal1: 
+                    Deal2: |5H |7H |TH |TS |3S |5S |QS |7S |KH |KH
+                    Deal3: |AS |3S |5S |8H |QH |JS |4H |6H |AH |6H
+                    Deal4: |9S |5S |3S |AS |JH |9S |8H |9S |TS |2S
+                    Off:";
+        assert_eq!(Deck::parse(&text.to_string()).talon_matches(), 2);
     }
 }
