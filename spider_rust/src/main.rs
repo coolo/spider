@@ -159,7 +159,7 @@ fn play_one_round(
     }
     if debug {
         deck.reset_moves();
-        deck.shortest_path(cap, debug, Some(won_decks));
+       // deck.shortest_path(cap, debug, Some(won_decks));
     }
     false
 }
