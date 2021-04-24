@@ -1,0 +1,17 @@
+# 1.5
+Play0: |7H |9S |4H |3S |QS 8H
+Play1: |6S |JS |2H |5H |7H JH
+Play2: |7H |4S |9H |2S |QS QH
+Play3: |AH |AH |AS |JS |5S TS
+Play4: |9S |4S |TS |6S KH
+Play5: |6H |KH |3S |7H JS
+Play6: |AS |AS |4S |KS 9H
+Play7: |2S |2H |TS |8H 3S
+Play8: |TS |QS |JH |QS 2S
+Play9: |2H |TH |4H |6H 5S
+Deal0: QH 9H KS 3S TH 8S 3H JS QH 5H
+Deal1: TH KH 7S TH 6S 8S JH JH 9H 5S
+Deal2: AH 4H..3H 6H 9S KH 5H 5H 8H 7S
+Deal3: 4S 2H 9S..7S 4H 6S 8H AS KS
+Deal4: 3H KS 6H 8S QH 7S 3H 5S AH 2S
+Off: 
